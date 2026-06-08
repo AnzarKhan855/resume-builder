@@ -20,16 +20,28 @@ export default function Home() {
     setResume({ ...resume, [field]: value });
   };
 
-  const printResume = () => window.print();
+  const printResume = () => {
+    window.print();
+  };
 
   const downloadPDF = async () => {
     const html2pdf = (await import("html2pdf.js")).default;
     const element = document.getElementById("resume-preview");
+
+    if (!element) {
+      alert("Resume preview not found");
+      return;
+    }
+
     html2pdf().from(element).save("resume.pdf");
   };
 
   const headerColor =
-    template === "blue" ? "#2563eb" : template === "dark" ? "#111827" : "#047857";
+    template === "blue"
+      ? "#2563eb"
+      : template === "dark"
+      ? "#111827"
+      : "#047857";
 
   return (
     <div style={{ display: "flex", gap: "30px", padding: "30px" }}>
@@ -37,7 +49,10 @@ export default function Home() {
         <h1>Resume Builder</h1>
 
         <label>Select Template</label>
-        <select onChange={(e) => setTemplate(e.target.value)} style={{ width: "100%", padding: "10px", marginBottom: "15px" }}>
+        <select
+          onChange={(e) => setTemplate(e.target.value)}
+          style={{ width: "100%", padding: "10px", marginBottom: "15px" }}
+        >
           <option value="blue">Blue Template</option>
           <option value="dark">Dark Template</option>
           <option value="green">Green Template</option>
@@ -73,11 +88,21 @@ export default function Home() {
   );
 }
 
-function Section({ title, content, color }: { title: string; content: string; color: string }) {
+function Section({
+  title,
+  content,
+  color,
+}: {
+  title: string;
+  content: string;
+  color: string;
+}) {
   return (
     <section style={{ marginTop: "20px" }}>
       <h2 style={{ borderBottom: `2px solid ${color}` }}>{title}</h2>
-      <p style={{ whiteSpace: "pre-line" }}>{content || `${title} will appear here`}</p>
+      <p style={{ whiteSpace: "pre-line" }}>
+        {content || `${title} will appear here`}
+      </p>
     </section>
   );
 }
