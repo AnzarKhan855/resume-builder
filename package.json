@@ -9,10 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
-<<<<<<< HEAD
     "html2pdf.js": "^0.14.0",
-=======
->>>>>>> b8026ba (Initial commit from Create Next App)
     "next": "16.2.7",
     "react": "19.2.4",
     "react-dom": "19.2.4"

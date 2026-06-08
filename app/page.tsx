@@ -1,177 +1,212 @@
-<<<<<<< HEAD
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
+
+type ResumeData = {
+  name: string;
+  title: string;
+  email: string;
+  phone: string;
+  location: string;
+  summary: string;
+  skills: string;
+  education: string;
+  projects: string;
+  experience: string;
+};
 
 export default function Home() {
-  const [template, setTemplate] = useState("blue");
+  const resumeRef = useRef<HTMLDivElement | null>(null);
 
-  const [resume, setResume] = useState({
-    name: "",
-    email: "",
+  const [data, setData] = useState<ResumeData>({
+    name: "Anzar Khan",
+    title: "B.Tech AI & ML Student",
+    email: "anzark964@gmail.com",
     phone: "",
-    linkedin: "",
-    skills: "",
-    education: "",
-    projects: "",
-    experience: "",
+    location: "Kanpur, India",
+    summary:
+      "Motivated B.Tech Artificial Intelligence and Machine Learning student with interest in web development, DSA, and AI-based applications.",
+    skills: "C++, Python, React, Next.js, TypeScript, HTML, CSS, GitHub",
+    education:
+      "B.Tech in Artificial Intelligence and Machine Learning\nAllenhouse Institute of Technology\nExpected Graduation: 2027",
+    projects:
+      "Resume Builder - Built using Next.js, React, TypeScript and deployed on Vercel.\nStudent Feedback Analysis System - React.js, Django and Python based feedback collection platform.",
+    experience: "Open to internships and beginner-level software development opportunities.",
   });
 
-  const handleChange = (field: string, value: string) => {
-    setResume({ ...resume, [field]: value });
-  };
-
-  const printResume = () => {
-    window.print();
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    setData({ ...data, [e.target.name]: e.target.value });
   };
 
   const downloadPDF = async () => {
-    const element = document.getElementById("resume-preview");
-
-    if (element === null) {
-      alert("Resume preview not found");
-      return;
-    }
+    if (!resumeRef.current) return;
 
     const html2pdf = (await import("html2pdf.js")).default;
 
-    html2pdf().from(element as HTMLElement).save("resume.pdf");
+    html2pdf()
+      .set({
+        margin: 0.5,
+        filename: `${data.name || "resume"}.pdf`,
+        image: { type: "jpeg", quality: 0.98 },
+        html2canvas: { scale: 2 },
+        jsPDF: { unit: "in", format: "a4", orientation: "portrait" },
+      })
+      .from(resumeRef.current)
+      .save();
   };
 
-  const headerColor =
-    template === "blue"
-      ? "#2563eb"
-      : template === "dark"
-      ? "#111827"
-      : "#047857";
-
   return (
-    <main style={{ display: "flex", gap: "30px", padding: "30px" }}>
-      <div style={{ width: "40%", background: "white", padding: "20px" }}>
-        <h1>Resume Builder</h1>
+    <main className="min-h-screen bg-gray-100 p-6">
+      <div className="mx-auto max-w-7xl">
+        <h1 className="mb-6 text-center text-4xl font-bold text-gray-900">
+          Resume Builder
+        </h1>
 
-        <label>Select Template</label>
-        <select
-          onChange={(e) => setTemplate(e.target.value)}
-          style={{ width: "100%", padding: "10px", marginBottom: "15px" }}
-        >
-          <option value="blue">Blue Template</option>
-          <option value="dark">Dark Template</option>
-          <option value="green">Green Template</option>
-        </select>
+        <div className="grid gap-6 lg:grid-cols-2">
+          <section className="rounded-xl bg-white p-6 shadow">
+            <h2 className="mb-4 text-2xl font-semibold text-gray-800">
+              Enter Your Details
+            </h2>
 
-        <input placeholder="Full Name" onChange={(e) => handleChange("name", e.target.value)} />
-        <input placeholder="Email" onChange={(e) => handleChange("email", e.target.value)} />
-        <input placeholder="Phone" onChange={(e) => handleChange("phone", e.target.value)} />
-        <input placeholder="LinkedIn URL" onChange={(e) => handleChange("linkedin", e.target.value)} />
+            <div className="space-y-4">
+              <input
+                name="name"
+                value={data.name}
+                onChange={handleChange}
+                placeholder="Full Name"
+                className="w-full rounded border p-3"
+              />
 
-        <textarea placeholder="Skills" onChange={(e) => handleChange("skills", e.target.value)} />
-        <textarea placeholder="Education" onChange={(e) => handleChange("education", e.target.value)} />
-        <textarea placeholder="Projects" onChange={(e) => handleChange("projects", e.target.value)} />
-        <textarea placeholder="Experience" onChange={(e) => handleChange("experience", e.target.value)} />
+              <input
+                name="title"
+                value={data.title}
+                onChange={handleChange}
+                placeholder="Professional Title"
+                className="w-full rounded border p-3"
+              />
 
-        <button onClick={printResume}>Print Resume</button>
-        <button onClick={downloadPDF}>Download PDF</button>
-      </div>
+              <input
+                name="email"
+                value={data.email}
+                onChange={handleChange}
+                placeholder="Email"
+                className="w-full rounded border p-3"
+              />
 
-      <div id="resume-preview" style={{ width: "60%", background: "white", padding: "30px" }}>
-        <div style={{ background: headerColor, color: "white", padding: "20px" }}>
-          <h1>{resume.name || "Your Name"}</h1>
-          <p>{resume.email || "Email"} | {resume.phone || "Phone"}</p>
-          <p>{resume.linkedin || "LinkedIn"}</p>
+              <input
+                name="phone"
+                value={data.phone}
+                onChange={handleChange}
+                placeholder="Phone"
+                className="w-full rounded border p-3"
+              />
+
+              <input
+                name="location"
+                value={data.location}
+                onChange={handleChange}
+                placeholder="Location"
+                className="w-full rounded border p-3"
+              />
+
+              <textarea
+                name="summary"
+                value={data.summary}
+                onChange={handleChange}
+                placeholder="Summary"
+                rows={4}
+                className="w-full rounded border p-3"
+              />
+
+              <textarea
+                name="skills"
+                value={data.skills}
+                onChange={handleChange}
+                placeholder="Skills"
+                rows={3}
+                className="w-full rounded border p-3"
+              />
+
+              <textarea
+                name="education"
+                value={data.education}
+                onChange={handleChange}
+                placeholder="Education"
+                rows={4}
+                className="w-full rounded border p-3"
+              />
+
+              <textarea
+                name="projects"
+                value={data.projects}
+                onChange={handleChange}
+                placeholder="Projects"
+                rows={5}
+                className="w-full rounded border p-3"
+              />
+
+              <textarea
+                name="experience"
+                value={data.experience}
+                onChange={handleChange}
+                placeholder="Experience"
+                rows={4}
+                className="w-full rounded border p-3"
+              />
+
+              <button
+                onClick={downloadPDF}
+                className="w-full rounded bg-blue-600 px-4 py-3 font-semibold text-white hover:bg-blue-700"
+              >
+                Download Resume PDF
+              </button>
+            </div>
+          </section>
+
+          <section className="rounded-xl bg-white p-6 shadow">
+            <h2 className="mb-4 text-2xl font-semibold text-gray-800">
+              Resume Preview
+            </h2>
+
+            <div
+              ref={resumeRef}
+              className="min-h-[900px] bg-white p-8 text-gray-900"
+            >
+              <div className="border-b pb-4 text-center">
+                <h1 className="text-4xl font-bold">{data.name}</h1>
+                <p className="mt-1 text-lg text-gray-700">{data.title}</p>
+                <p className="mt-2 text-sm">
+                  {data.email} {data.phone && `| ${data.phone}`} |{" "}
+                  {data.location}
+                </p>
+              </div>
+
+              <ResumeSection title="Summary" content={data.summary} />
+              <ResumeSection title="Skills" content={data.skills} />
+              <ResumeSection title="Education" content={data.education} />
+              <ResumeSection title="Projects" content={data.projects} />
+              <ResumeSection title="Experience" content={data.experience} />
+            </div>
+          </section>
         </div>
-
-        <Section title="Skills" content={resume.skills} color={headerColor} />
-        <Section title="Education" content={resume.education} color={headerColor} />
-        <Section title="Projects" content={resume.projects} color={headerColor} />
-        <Section title="Experience" content={resume.experience} color={headerColor} />
       </div>
     </main>
   );
 }
 
-function Section({
+function ResumeSection({
   title,
   content,
-  color,
 }: {
   title: string;
   content: string;
-  color: string;
 }) {
   return (
-    <section style={{ marginTop: "20px" }}>
-      <h2 style={{ borderBottom: `2px solid ${color}` }}>{title}</h2>
-      <p style={{ whiteSpace: "pre-line" }}>
-        {content || `${title} will appear here`}
-      </p>
-    </section>
-  );
-}
-=======
-import Image from "next/image";
-
-export default function Home() {
-  return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+    <div className="mt-6">
+      <h2 className="border-b text-xl font-bold text-blue-700">{title}</h2>
+      <div className="mt-2 whitespace-pre-line text-sm leading-6">{content}</div>
     </div>
   );
 }
->>>>>>> b8026ba (Initial commit from Create Next App)
