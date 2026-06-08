@@ -44,7 +44,7 @@ export default function Home() {
       : "#047857";
 
   return (
-    <div style={{ display: "flex", gap: "30px", padding: "30px" }}>
+    <main style={{ display: "flex", gap: "30px", padding: "30px" }}>
       <div style={{ width: "40%", background: "white", padding: "20px" }}>
         <h1>Resume Builder</h1>
 
@@ -58,24 +58,59 @@ export default function Home() {
           <option value="green">Green Template</option>
         </select>
 
-        <input placeholder="Full Name" onChange={(e) => handleChange("name", e.target.value)} />
-        <input placeholder="Email" onChange={(e) => handleChange("email", e.target.value)} />
-        <input placeholder="Phone" onChange={(e) => handleChange("phone", e.target.value)} />
-        <input placeholder="LinkedIn URL" onChange={(e) => handleChange("linkedin", e.target.value)} />
+        <input
+          placeholder="Full Name"
+          onChange={(e) => handleChange("name", e.target.value)}
+        />
 
-        <textarea placeholder="Skills" onChange={(e) => handleChange("skills", e.target.value)} />
-        <textarea placeholder="Education" onChange={(e) => handleChange("education", e.target.value)} />
-        <textarea placeholder="Projects" onChange={(e) => handleChange("projects", e.target.value)} />
-        <textarea placeholder="Experience" onChange={(e) => handleChange("experience", e.target.value)} />
+        <input
+          placeholder="Email"
+          onChange={(e) => handleChange("email", e.target.value)}
+        />
+
+        <input
+          placeholder="Phone"
+          onChange={(e) => handleChange("phone", e.target.value)}
+        />
+
+        <input
+          placeholder="LinkedIn URL"
+          onChange={(e) => handleChange("linkedin", e.target.value)}
+        />
+
+        <textarea
+          placeholder="Skills"
+          onChange={(e) => handleChange("skills", e.target.value)}
+        />
+
+        <textarea
+          placeholder="Education"
+          onChange={(e) => handleChange("education", e.target.value)}
+        />
+
+        <textarea
+          placeholder="Projects"
+          onChange={(e) => handleChange("projects", e.target.value)}
+        />
+
+        <textarea
+          placeholder="Experience"
+          onChange={(e) => handleChange("experience", e.target.value)}
+        />
 
         <button onClick={printResume}>Print Resume</button>
         <button onClick={downloadPDF}>Download PDF</button>
       </div>
 
-      <div id="resume-preview" style={{ width: "60%", background: "white", padding: "30px" }}>
+      <div
+        id="resume-preview"
+        style={{ width: "60%", background: "white", padding: "30px" }}
+      >
         <div style={{ background: headerColor, color: "white", padding: "20px" }}>
           <h1>{resume.name || "Your Name"}</h1>
-          <p>{resume.email || "Email"} | {resume.phone || "Phone"}</p>
+          <p>
+            {resume.email || "Email"} | {resume.phone || "Phone"}
+          </p>
           <p>{resume.linkedin || "LinkedIn"}</p>
         </div>
 
@@ -84,7 +119,7 @@ export default function Home() {
         <Section title="Projects" content={resume.projects} color={headerColor} />
         <Section title="Experience" content={resume.experience} color={headerColor} />
       </div>
-    </div>
+    </main>
   );
 }
 
