@@ -33,8 +33,29 @@ export default function Home() {
     }
 
     const html2pdf = (await import("html2pdf.js")).default;
-
     html2pdf().from(element as HTMLElement).save("resume.pdf");
+  };
+
+  const saveResume = async () => {
+    try {
+      const response = await fetch("/api/resumes", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(resume),
+      });
+
+      if (!response.ok) {
+        alert("Failed to save resume");
+        return;
+      }
+
+      alert("Resume saved successfully!");
+    } catch (error) {
+      console.error(error);
+      alert("Something went wrong");
+    }
   };
 
   const headerColor =
@@ -71,6 +92,13 @@ export default function Home() {
 
         <button onClick={printResume}>Print Resume</button>
         <button onClick={downloadPDF}>Download PDF</button>
+
+        <button
+          onClick={saveResume}
+          className="w-full rounded bg-green-600 px-4 py-3 font-semibold text-white hover:bg-green-700"
+        >
+          Save Resume
+        </button>
       </div>
 
       <div id="resume-preview" style={{ width: "60%", background: "white", padding: "30px" }}>
