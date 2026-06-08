@@ -20,24 +20,40 @@ export default function Home() {
     setResume({ ...resume, [field]: value });
   };
 
-  const printResume = () => window.print();
+  const printResume = () => {
+    window.print();
+  };
 
   const downloadPDF = async () => {
-    const html2pdf = (await import("html2pdf.js")).default;
     const element = document.getElementById("resume-preview");
-    html2pdf().from(element).save("resume.pdf");
+
+    if (element === null) {
+      alert("Resume preview not found");
+      return;
+    }
+
+    const html2pdf = (await import("html2pdf.js")).default;
+
+    html2pdf().from(element as HTMLElement).save("resume.pdf");
   };
 
   const headerColor =
-    template === "blue" ? "#2563eb" : template === "dark" ? "#111827" : "#047857";
+    template === "blue"
+      ? "#2563eb"
+      : template === "dark"
+      ? "#111827"
+      : "#047857";
 
   return (
-    <div style={{ display: "flex", gap: "30px", padding: "30px" }}>
+    <main style={{ display: "flex", gap: "30px", padding: "30px" }}>
       <div style={{ width: "40%", background: "white", padding: "20px" }}>
         <h1>Resume Builder</h1>
 
         <label>Select Template</label>
-        <select onChange={(e) => setTemplate(e.target.value)} style={{ width: "100%", padding: "10px", marginBottom: "15px" }}>
+        <select
+          onChange={(e) => setTemplate(e.target.value)}
+          style={{ width: "100%", padding: "10px", marginBottom: "15px" }}
+        >
           <option value="blue">Blue Template</option>
           <option value="dark">Dark Template</option>
           <option value="green">Green Template</option>
@@ -69,15 +85,25 @@ export default function Home() {
         <Section title="Projects" content={resume.projects} color={headerColor} />
         <Section title="Experience" content={resume.experience} color={headerColor} />
       </div>
-    </div>
+    </main>
   );
 }
 
-function Section({ title, content, color }: { title: string; content: string; color: string }) {
+function Section({
+  title,
+  content,
+  color,
+}: {
+  title: string;
+  content: string;
+  color: string;
+}) {
   return (
     <section style={{ marginTop: "20px" }}>
       <h2 style={{ borderBottom: `2px solid ${color}` }}>{title}</h2>
-      <p style={{ whiteSpace: "pre-line" }}>{content || `${title} will appear here`}</p>
+      <p style={{ whiteSpace: "pre-line" }}>
+        {content || `${title} will appear here`}
+      </p>
     </section>
   );
 }
