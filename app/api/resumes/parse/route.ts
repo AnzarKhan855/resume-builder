@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { parseResumeText } from "@/src/lib/resume-parser";
 import mammoth from "mammoth";
 
+export const runtime = "nodejs";
+
 function isPdfBuffer(buffer: Buffer): boolean {
   if (buffer.length < 4) return false;
   // Check within first 1024 bytes for %PDF (PDF 1.0-2.0 spec)
@@ -18,18 +20,6 @@ function isDocxBuffer(buffer: Buffer): boolean {
     buffer[2] === 0x03 &&
     buffer[3] === 0x04
   );
-}
-
-// In-memory worker setup to prevent Next.js chunk relative import failures
-async function ensurePdfWorker() {
-  if (!(globalThis as any).pdfjsWorker) {
-    try {
-      const worker = await import("pdfjs-dist/legacy/build/pdf.worker.mjs");
-      (globalThis as any).pdfjsWorker = worker;
-    } catch (err) {
-      console.warn("PDF_WORKER_INIT_WARN:", err);
-    }
-  }
 }
 
 export async function POST(req: NextRequest) {
@@ -102,7 +92,7 @@ export async function POST(req: NextRequest) {
       fileType.includes("wordprocessingml") ||
       isDocxBuffer(buffer);
 
-    // 1. PDF Parsing
+    // 1. PDF Parsing (Server-Safe via unpdf)
     if (isPdf) {
       // Validate magic bytes
       if (!isPdfBuffer(buffer)) {
@@ -117,16 +107,9 @@ export async function POST(req: NextRequest) {
       }
 
       try {
-        await ensurePdfWorker();
-        const { PDFParse } = await import("pdf-parse");
-        const parser = new PDFParse({ data: new Uint8Array(buffer) });
-
-        try {
-          const textResult = await parser.getText();
-          extractedText = (textResult?.text || "").trim();
-        } finally {
-          await parser.destroy();
-        }
+        const { extractText } = await import("unpdf");
+        const result = await extractText(new Uint8Array(buffer), { mergePages: true });
+        extractedText = (result?.text || "").trim();
 
         // Strip page marker artifacts like "-- 1 of 2 --" to accurately assess real text content
         const cleanedText = extractedText.replace(/--\s*\d+\s*of\s*\d+\s*--/gi, "").trim();
@@ -191,7 +174,7 @@ export async function POST(req: NextRequest) {
           {
             error: "PDF_PARSE_FAILED",
             isScanned: false,
-            message: "We couldn't process this PDF. Please try another PDF or DOCX file.",
+            message: "We couldn't process this PDF right now. Please try again or upload a DOCX file.",
             details: pdfErr?.message || "PDF processing failed",
           },
           { status: 422 }
