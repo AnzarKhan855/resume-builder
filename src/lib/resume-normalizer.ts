@@ -9,6 +9,7 @@ import {
   SkillItem,
   TemplateId,
 } from "@/src/types/resume";
+import { categorizeSkill } from "./skill-categorizer";
 
 export function generateId(): string {
   return Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
@@ -138,12 +139,12 @@ export function normalizeResume(raw: any): ResumeData {
   if (Array.isArray(raw.skills)) {
     skills = raw.skills.map((item: any) => {
       if (typeof item === "string") {
-        return { id: generateId(), name: item, category: "General" };
+        return { id: generateId(), name: item, category: categorizeSkill(item) };
       }
       return {
         id: item.id || generateId(),
         name: item.name || "",
-        category: item.category || "General",
+        category: item.category && item.category !== "General" ? item.category : categorizeSkill(item.name || ""),
         level: item.level || "Intermediate",
       };
     });
@@ -155,7 +156,7 @@ export function normalizeResume(raw: any): ResumeData {
       .map((name) => ({
         id: generateId(),
         name,
-        category: "General",
+        category: categorizeSkill(name),
         level: "Intermediate",
       }));
   }
@@ -202,6 +203,11 @@ export function normalizeResume(raw: any): ResumeData {
       : DEFAULT_SECTION_ORDER,
     customization,
     isAtsMode: Boolean(raw.isAtsMode),
+    targetRole: raw.targetRole || "",
+    jobDescription: raw.jobDescription || "",
+    baseResumeId: raw.baseResumeId || undefined,
+    tailoredFromId: raw.tailoredFromId || undefined,
+    isDraftFallback: Boolean(raw.isDraftFallback),
     createdAt: raw.createdAt ? new Date(raw.createdAt).toISOString() : new Date().toISOString(),
     updatedAt: raw.updatedAt ? new Date(raw.updatedAt).toISOString() : new Date().toISOString(),
 

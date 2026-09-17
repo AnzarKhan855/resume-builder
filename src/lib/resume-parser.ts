@@ -14,6 +14,7 @@ import {
   CourseworkItem,
 } from "@/src/types/resume";
 import { generateId } from "./resume-normalizer";
+import { categorizeSkill } from "./skill-categorizer";
 
 export type ConfidenceLevel = "high" | "medium" | "low";
 
@@ -197,7 +198,7 @@ export function parseResumeText(rawText: string): ParsedResumeResult {
   const skills: SkillItem[] = uniqueSkills.map((name) => ({
     id: generateId(),
     name,
-    category: "General",
+    category: categorizeSkill(name),
     level: "Intermediate",
   }));
 
@@ -262,9 +263,16 @@ export function parseResumeText(rawText: string): ParsedResumeResult {
       line.match(/\b(19\d\d|20\d\d)\s*(?:-|–|—|to)\s*(19\d\d|20\d\d|Present)\b/i) ||
       line.match(/\b(19\d\d|20\d\d)\b/);
 
-    const isDegree = /bachelor|master|phd|doctor|associate|b\.s\.|b\.a\.|m\.s\.|m\.a\.|btech|degree|diploma|b\.e\.|m\.tech/i.test(line);
+    // If certification line accidentally ended up in education section, route to certifications
+    const isCertInEdu = /aws certified|certified kubernetes|comptia|cisco|pmp|scrum master|udemy|coursera|google cloud certified|meta certified|hashicorp/i.test(line);
+    if (isCertInEdu) {
+      sections.certifications.push(line);
+      continue;
+    }
+
+    const isDegree = /\b(?:bachelor|master|ph\.?d|doctorate|associate|b\.?s\.?|b\.?a\.?|m\.?s\.?|m\.?a\.?|b\.?tech|b\.?e\.?|m\.?tech|b\.?sc|m\.?sc|bca|mca|b\.?com|m\.?com|bba|mba|diploma|degree)\b/i.test(line);
     const isInst = /university|college|institute|school|academy|polytechnic/i.test(line);
-    const gpaMatch = line.match(/GPA:?\s*([0-9.]+)(?:\s*\/\s*[0-9.]+)?/i);
+    const gpaMatch = line.match(/(?:GPA|CGPA|Grade):?\s*([0-9.]+)(?:\s*\/\s*[0-9.]+)?/i);
 
     if (gpaMatch) {
       if (currentEdu) {
@@ -301,20 +309,26 @@ export function parseResumeText(rawText: string): ParsedResumeResult {
         .replace(/[|·•,\-–—]\s*$/, "")
         .trim();
 
+      // Split degree and field of study (e.g. "Bachelor of Science in Computer Science")
+      const splitDegree = lineWithoutDates.split(/\s+in\s+/i);
+      const degreePart = splitDegree[0]?.trim() || lineWithoutDates;
+      const fieldPart = splitDegree.length > 1 ? splitDegree.slice(1).join(" in ").trim() : "";
+
       if (!currentEdu) {
         const prevLine = i > 0 && !eduLines[i - 1].includes("@") ? eduLines[i - 1] : "";
         currentEdu = {
           id: generateId(),
           institution: prevLine || "",
-          degree: lineWithoutDates,
-          fieldOfStudy: "",
+          degree: degreePart,
+          fieldOfStudy: fieldPart,
           startDate: dateMatch ? dateMatch[1] || "" : "",
           endDate: dateMatch ? dateMatch[2] || dateMatch[0] : "",
           current: dateMatch ? /present/i.test(dateMatch[0]) : false,
           achievements: [],
         };
       } else {
-        currentEdu.degree = lineWithoutDates;
+        currentEdu.degree = degreePart;
+        if (fieldPart) currentEdu.fieldOfStudy = fieldPart;
         if (dateMatch && !currentEdu.endDate) {
           currentEdu.startDate = dateMatch[1] || "";
           currentEdu.endDate = dateMatch[2] || dateMatch[0];
@@ -681,4 +695,138 @@ function finishProject(item: Partial<ProjectItem>): ProjectItem {
     description: item.description || "",
     technologies: item.technologies || [],
   };
+}
+
+export { categorizeSkill } from "./skill-categorizer";
+
+/**
+ * Merges AI semantic extraction into the baseline heuristic result.
+ * Strictly avoids hallucination by only accepting fields that are non-empty and valid.
+ */
+export function mergeAiParsedData(base: ParsedResumeResult, ai: any): ParsedResumeResult {
+  if (!ai || typeof ai !== "object") return base;
+
+  // Personal Info
+  if (ai.personalInfo) {
+    if (ai.personalInfo.fullName && typeof ai.personalInfo.fullName === "string") {
+      base.personalInfo.fullName = ai.personalInfo.fullName.trim();
+      base.title = `${base.personalInfo.fullName} — Resume`;
+    }
+    if (ai.personalInfo.email && typeof ai.personalInfo.email === "string") {
+      base.personalInfo.email = ai.personalInfo.email.trim();
+    }
+    if (ai.personalInfo.phone && typeof ai.personalInfo.phone === "string") {
+      base.personalInfo.phone = ai.personalInfo.phone.trim();
+    }
+    if (ai.personalInfo.location && typeof ai.personalInfo.location === "string") {
+      base.personalInfo.location = ai.personalInfo.location.trim();
+    }
+    if (ai.personalInfo.jobTitle && typeof ai.personalInfo.jobTitle === "string") {
+      base.personalInfo.jobTitle = ai.personalInfo.jobTitle.trim();
+    }
+    if (ai.personalInfo.linkedin && typeof ai.personalInfo.linkedin === "string") {
+      base.personalInfo.linkedin = ai.personalInfo.linkedin.trim();
+    }
+    if (ai.personalInfo.github && typeof ai.personalInfo.github === "string") {
+      base.personalInfo.github = ai.personalInfo.github.trim();
+    }
+  }
+
+  // Summary
+  if (ai.summary && typeof ai.summary === "string" && ai.summary.trim()) {
+    base.summary = ai.summary.trim();
+  }
+
+  // Experience
+  if (Array.isArray(ai.experience) && ai.experience.length > 0) {
+    const aiExp: ExperienceItem[] = ai.experience.map((item: any) => ({
+      id: generateId(),
+      company: item.company || "Company",
+      position: item.position || "Role",
+      location: item.location || "",
+      startDate: item.startDate || "",
+      endDate: item.endDate || "Present",
+      current: Boolean(item.current || /present|current/i.test(item.endDate || "")),
+      description: item.description || (Array.isArray(item.highlights) ? item.highlights.join("\n• ") : ""),
+      highlights: Array.isArray(item.highlights) ? item.highlights : [],
+    }));
+    if (aiExp.length >= base.experience.length) {
+      base.experience = aiExp;
+    }
+  }
+
+  // Education
+  if (Array.isArray(ai.education) && ai.education.length > 0) {
+    const aiEdu: EducationItem[] = ai.education.map((item: any) => ({
+      id: generateId(),
+      institution: item.institution || "Institution",
+      degree: item.degree || "Degree",
+      fieldOfStudy: item.fieldOfStudy || "",
+      location: item.location || "",
+      startDate: item.startDate || "",
+      endDate: item.endDate || "",
+      current: Boolean(item.current || /present|current/i.test(item.endDate || "")),
+      gpa: item.gpa || "",
+      achievements: Array.isArray(item.achievements) ? item.achievements : [],
+    }));
+    if (aiEdu.length >= base.education.length) {
+      base.education = aiEdu;
+    }
+  }
+
+  // Projects
+  if (Array.isArray(ai.projects) && ai.projects.length > 0) {
+    const aiProj: ProjectItem[] = ai.projects.map((item: any) => ({
+      id: generateId(),
+      title: item.title || "Project",
+      subtitle: item.subtitle || "",
+      link: item.link || "",
+      github: item.github || "",
+      description: item.description || "",
+      technologies: Array.isArray(item.technologies) ? item.technologies : [],
+    }));
+    if (aiProj.length >= base.projects.length) {
+      base.projects = aiProj;
+    }
+  }
+
+  // Skills
+  if (Array.isArray(ai.skills) && ai.skills.length > 0) {
+    const aiSkills: SkillItem[] = ai.skills
+      .filter((s: any) => s && (typeof s === "string" || typeof s.name === "string"))
+      .map((s: any) => {
+        const name = (typeof s === "string" ? s : s.name).trim();
+        return {
+          id: generateId(),
+          name,
+          category: s.category || categorizeSkill(name),
+          level: "Intermediate" as const,
+        };
+      });
+    if (aiSkills.length > 0) {
+      const existingNames = new Set(base.skills.map((s) => s.name.toLowerCase()));
+      for (const s of aiSkills) {
+        if (!existingNames.has(s.name.toLowerCase())) {
+          base.skills.push(s);
+          existingNames.add(s.name.toLowerCase());
+        }
+      }
+    }
+  }
+
+  // Certifications
+  if (Array.isArray(ai.certifications) && ai.certifications.length > 0) {
+    const aiCerts: CertificationItem[] = ai.certifications.map((item: any) => ({
+      id: generateId(),
+      name: item.name || "Certification",
+      issuer: item.issuer || "",
+      date: item.date || "",
+      url: item.url || "",
+    }));
+    if (aiCerts.length >= base.certifications.length) {
+      base.certifications = aiCerts;
+    }
+  }
+
+  return base;
 }

@@ -20,6 +20,7 @@ import {
   Sparkles,
   ExternalLink,
   LogOut,
+  Layers,
 } from "lucide-react";
 
 export default function DashboardPage() {
@@ -109,26 +110,54 @@ export default function DashboardPage() {
 
   // Called when user finishes reviewing imported data
   const handleImportConfirmed = async (finalData: ResumeData) => {
+    // 1. Strip client temporary IDs so database assigns canonical ID
+    const payload: Partial<ResumeData> = { ...finalData };
+    if (payload._id && !/^[0-9a-fA-F]{24}$/.test(payload._id)) {
+      delete payload._id;
+      delete payload.id;
+    }
+
     try {
+      // 2. Persist directly to canonical Database / API
       const res = await fetch("/api/resumes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(finalData),
+        body: JSON.stringify(payload),
       });
 
       if (res.ok) {
         const result = await res.json();
-        const savedId = result.resume?._id || result.resume?.id;
-        if (savedId) {
-          router.push(`/editor/${savedId}`);
-        } else {
-          router.push("/editor/new");
-        }
+        const savedId = result.resumeId || result.resume?._id || result.resume?.id;
+        const savedResume = result.resume || { ...finalData, _id: savedId, id: savedId };
+
+        // 3. Cache offline recovery copy and clear temporary import staging
+        try {
+          localStorage.setItem(`resume_draft_${savedId}`, JSON.stringify(savedResume));
+          sessionStorage.removeItem("pending_import_resume");
+          localStorage.removeItem("pending_import_resume");
+        } catch {}
+
+        // 4. Navigate to editor with canonical database ID
+        router.push(`/editor/${savedId}`);
+        return;
       }
     } catch (e) {
       console.error("Save imported error:", e);
-      router.push("/editor/new");
     }
+
+    // 5. Emergency offline recovery fallback ONLY if network failed
+    const fallbackId = `import_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+    const preparedData: ResumeData = {
+      ...finalData,
+      _id: fallbackId,
+      id: fallbackId,
+      isDraftFallback: true,
+    };
+    try {
+      localStorage.setItem(`resume_draft_${fallbackId}`, JSON.stringify(preparedData));
+      sessionStorage.setItem("pending_import_resume", JSON.stringify(preparedData));
+    } catch {}
+    router.push(`/editor/${fallbackId}`);
   };
 
   const filteredResumes = resumes.filter((r) => {
@@ -201,6 +230,13 @@ export default function DashboardPage() {
           </div>
 
           <div className="flex items-center gap-3">
+            <Link
+              href="/templates"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-sm font-semibold shadow-xs transition"
+            >
+              <Layers className="w-4 h-4 text-purple-600" />
+              50 Templates
+            </Link>
             <button
               onClick={() => setIsUploadModalOpen(true)}
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-sm font-semibold shadow-xs transition"

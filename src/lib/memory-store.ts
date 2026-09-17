@@ -150,10 +150,13 @@ if (!(global as any).__resumeStore) {
 
 export const memoryStore = {
   getAll: (userId?: string): ResumeData[] => {
+    const nonDemo = globalStore.resumes.filter(
+      (r: ResumeData) => r._id !== "demo-sample-resume" && r.id !== "demo-sample-resume"
+    );
     if (userId) {
-      return globalStore.resumes.filter((r: ResumeData) => !r.userId || r.userId === userId);
+      return nonDemo.filter((r: ResumeData) => r.userId === userId);
     }
-    return globalStore.resumes;
+    return nonDemo;
   },
   getById: (id: string): ResumeData | undefined => {
     return globalStore.resumes.find((r: ResumeData) => r._id === id || r.id === id);

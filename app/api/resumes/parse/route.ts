@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { parseResumeText } from "@/src/lib/resume-parser";
+import { parseResumeText, mergeAiParsedData } from "@/src/lib/resume-parser";
 import mammoth from "mammoth";
 
 export const runtime = "nodejs";
@@ -236,6 +236,122 @@ export async function POST(req: NextRequest) {
 
     // 3. Layered parsing and confidence scoring
     const parsedData = parseResumeText(extractedText);
+
+    // 4. Optional Groq AI Semantic Refinement Pass (High Accuracy & Anti-Hallucination)
+    const groqApiKey = process.env.GROQ_API_KEY;
+    if (groqApiKey && extractedText.length >= 60) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 6000);
+
+        const aiPrompt = `You are a world-class ATS resume parser and information extraction specialist.
+Analyze this raw resume text and extract the structured resume data as a JSON object matching this schema:
+{
+  "personalInfo": {
+    "fullName": "string",
+    "email": "string",
+    "phone": "string",
+    "location": "string",
+    "jobTitle": "string",
+    "website": "string",
+    "linkedin": "string",
+    "github": "string"
+  },
+  "summary": "string",
+  "experience": [
+    {
+      "company": "string",
+      "position": "string",
+      "location": "string",
+      "startDate": "string",
+      "endDate": "string",
+      "current": false,
+      "description": "string",
+      "highlights": ["string"]
+    }
+  ],
+  "education": [
+    {
+      "institution": "string",
+      "degree": "string",
+      "fieldOfStudy": "string",
+      "location": "string",
+      "startDate": "string",
+      "endDate": "string",
+      "current": false,
+      "gpa": "string",
+      "achievements": ["string"]
+    }
+  ],
+  "projects": [
+    {
+      "title": "string",
+      "link": "string",
+      "github": "string",
+      "technologies": ["string"],
+      "description": "string"
+    }
+  ],
+  "skills": [
+    {
+      "name": "string",
+      "category": "string"
+    }
+  ],
+  "certifications": [
+    {
+      "name": "string",
+      "issuer": "string",
+      "date": "string"
+    }
+  ]
+}
+
+CRITICAL RULES:
+1. NEVER hallucinate or invent any information. Only extract facts explicitly stated in the text.
+2. If a field is not present in the resume, use empty string "" or empty array [].
+3. Separate Education (university degrees) from Certifications (AWS, Coursera, licenses) and Projects (software, hardware, academic projects).
+4. Return ONLY valid JSON.`;
+
+        const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+          method: "POST",
+          signal: controller.signal,
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${groqApiKey}`,
+          },
+          body: JSON.stringify({
+            model: "llama-3.3-70b-versatile",
+            messages: [
+              {
+                role: "system",
+                content: "You extract structured resume JSON. You NEVER invent facts. Return valid JSON only.",
+              },
+              {
+                role: "user",
+                content: `${aiPrompt}\n\nRAW RESUME TEXT:\n${extractedText.slice(0, 8000)}`,
+              },
+            ],
+            temperature: 0.1,
+            max_tokens: 3000,
+            response_format: { type: "json_object" },
+          }),
+        });
+
+        clearTimeout(timeoutId);
+
+        if (groqRes.ok) {
+          const aiJson = await groqRes.json();
+          const content = aiJson.choices?.[0]?.message?.content;
+          if (content) {
+            const aiParsed = JSON.parse(content);
+            mergeAiParsedData(parsedData, aiParsed);
+          }
+        }
+      } catch (aiErr: any) {
+        console.warn("Groq AI parsing pass encountered an issue, preserving heuristic parse:", aiErr?.message || aiErr);
+      }
+    }
 
     return NextResponse.json({
       message: "Resume imported and parsed successfully",

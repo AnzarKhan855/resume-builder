@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import mongoose from "mongoose";
 import { connectDB, isDatabaseConfigured } from "@/src/lib/mongodb";
 import Resume from "@/src/models/Resume";
 import { normalizeResume, prepareResumeForSave } from "@/src/lib/resume-normalizer";
@@ -18,11 +19,14 @@ export async function POST(
     if (!isDatabaseConfigured()) {
       originalData = memoryStore.getById(id);
     } else {
-      await connectDB();
-      const doc = await Resume.findById(id);
-      if (doc) {
-        originalData = doc.toObject ? doc.toObject() : doc;
-      } else {
+      if (mongoose.isValidObjectId(id)) {
+        await connectDB();
+        const doc = await Resume.findById(id);
+        if (doc) {
+          originalData = doc.toObject ? doc.toObject() : doc;
+        }
+      }
+      if (!originalData) {
         originalData = memoryStore.getById(id);
       }
     }
@@ -31,14 +35,28 @@ export async function POST(
       return NextResponse.json({ message: "Original resume not found" }, { status: 404 });
     }
 
+    // User Isolation: Check ownership before allowing duplicate
+    if (originalData.userId) {
+      if (!user || originalData.userId.toString() !== user.userId) {
+        return NextResponse.json({ message: "Forbidden: You do not own this resume" }, { status: 403 });
+      }
+    }
+
     const normalized = normalizeResume(originalData);
+
+    const cleanUserId =
+      user?.userId && mongoose.isValidObjectId(user.userId)
+        ? user.userId
+        : originalData.userId && mongoose.isValidObjectId(originalData.userId)
+        ? originalData.userId.toString()
+        : undefined;
 
     const duplicatePayload = {
       ...normalized,
       _id: undefined,
       id: undefined,
       title: `Copy of ${normalized.title || "Resume"}`,
-      userId: user?.userId || normalized.userId,
+      userId: cleanUserId,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -53,7 +71,12 @@ export async function POST(
       );
     }
 
-    const newDoc = await Resume.create(prepared);
+    const toSave: any = { ...prepared };
+    delete toSave._id;
+    delete toSave.id;
+    if (!toSave.userId) delete toSave.userId;
+
+    const newDoc = await Resume.create(toSave);
     const result = normalizeResume(newDoc.toObject ? newDoc.toObject() : newDoc);
 
     return NextResponse.json(

@@ -7,7 +7,11 @@ import { useAuth } from "@/src/context/AuthContext";
 import ResumeUploadModal from "@/src/components/import/ResumeUploadModal";
 import ImportReviewModal from "@/src/components/import/ImportReviewModal";
 import { ResumeData } from "@/src/types/resume";
-import { AVAILABLE_TEMPLATES } from "@/src/components/templates/TemplateRenderer";
+import {
+  TEMPLATES_REGISTRY,
+  TEMPLATE_CATEGORIES,
+  TemplateCategory,
+} from "@/src/lib/templates-registry";
 import {
   Sparkles,
   ArrowRight,
@@ -18,6 +22,9 @@ import {
   Download,
   Layers,
   Edit3,
+  Search,
+  Check,
+  FileText,
 } from "lucide-react";
 
 export default function LandingPage() {
@@ -25,7 +32,8 @@ export default function LandingPage() {
   const { user, openAuthModal } = useAuth();
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [parsedImportData, setParsedImportData] = useState<ResumeData | null>(null);
-  const [selectedTemplatePreview, setSelectedTemplatePreview] = useState("modern");
+  const [selectedCategory, setSelectedCategory] = useState<TemplateCategory | "all">("all");
+  const [templateSearch, setTemplateSearch] = useState("");
 
   const handleUploadSuccess = (data: ResumeData) => {
     setIsUploadModalOpen(false);
@@ -33,22 +41,54 @@ export default function LandingPage() {
   };
 
   const handleImportConfirmed = async (finalData: ResumeData) => {
+    // 1. Strip client temporary IDs so database assigns canonical ID
+    const payload: Partial<ResumeData> = { ...finalData };
+    if (payload._id && !/^[0-9a-fA-F]{24}$/.test(payload._id)) {
+      delete payload._id;
+      delete payload.id;
+    }
+
     try {
+      // 2. Persist directly to canonical Database / API
       const res = await fetch("/api/resumes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(finalData),
+        body: JSON.stringify(payload),
       });
+
       if (res.ok) {
         const result = await res.json();
-        const id = result.resume?._id || result.resume?.id;
-        router.push(id ? `/editor/${id}` : "/editor/new");
-      } else {
-        router.push("/editor/new");
+        const savedId = result.resumeId || result.resume?._id || result.resume?.id;
+        const savedResume = result.resume || { ...finalData, _id: savedId, id: savedId };
+
+        // 3. Cache offline recovery copy and clear temporary import staging
+        try {
+          localStorage.setItem(`resume_draft_${savedId}`, JSON.stringify(savedResume));
+          sessionStorage.removeItem("pending_import_resume");
+          localStorage.removeItem("pending_import_resume");
+        } catch {}
+
+        // 4. Navigate to editor with canonical database ID
+        router.push(`/editor/${savedId}`);
+        return;
       }
-    } catch {
-      router.push("/editor/new");
+    } catch (apiErr) {
+      console.warn("POST /api/resumes network error, falling back to local draft:", apiErr);
     }
+
+    // 5. Emergency offline recovery fallback ONLY if network failed
+    const fallbackId = `import_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+    const preparedData: ResumeData = {
+      ...finalData,
+      _id: fallbackId,
+      id: fallbackId,
+      isDraftFallback: true,
+    };
+    try {
+      localStorage.setItem(`resume_draft_${fallbackId}`, JSON.stringify(preparedData));
+      sessionStorage.setItem("pending_import_resume", JSON.stringify(preparedData));
+    } catch {}
+    router.push(`/editor/${fallbackId}`);
   };
 
   return (
@@ -348,59 +388,137 @@ export default function LandingPage() {
               Recruiter-Approved Designs
             </span>
             <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
-              5 Professional ATS Templates
+              50 ATS-Compliant Professional Templates
             </h2>
             <p className="text-slate-600 text-sm sm:text-base mt-2">
-              Switch between templates at any time without losing any resume details.
+              Engineered for Workday, Lever, Greenhouse, and Taleo. Switch designs anytime with zero data loss.
             </p>
           </div>
 
-          {/* Template Tab Selector */}
-          <div className="flex flex-wrap justify-center gap-2 mb-10">
-            {AVAILABLE_TEMPLATES.map((t) => (
+          {/* Search & Category Filter Controls */}
+          <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/80 shadow-xs mb-8 space-y-4 max-w-4xl mx-auto">
+            <div className="relative">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Search templates by role (e.g., Software Engineer, Data Scientist, Product Manager)..."
+                value={templateSearch}
+                onChange={(e) => setTemplateSearch(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+              />
+            </div>
+
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
               <button
-                key={t.id}
                 type="button"
-                onClick={() => setSelectedTemplatePreview(t.id)}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
-                  selectedTemplatePreview === t.id
-                    ? "bg-blue-600 text-white shadow-xs"
-                    : "bg-white text-slate-700 hover:bg-slate-100 border border-slate-200"
+                onClick={() => setSelectedCategory("all")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition shrink-0 ${
+                  selectedCategory === "all"
+                    ? "bg-slate-900 text-white shadow-2xs"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200/70"
                 }`}
               >
-                <span>{t.name}</span>
-                <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${selectedTemplatePreview === t.id ? "bg-blue-700 text-blue-100" : "bg-slate-100 text-slate-500"}`}>
-                  {t.badge}
-                </span>
+                All (50)
               </button>
-            ))}
+              {TEMPLATE_CATEGORIES.map((cat) => (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => setSelectedCategory(cat.id)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition shrink-0 flex items-center gap-1.5 ${
+                    selectedCategory === cat.id
+                      ? "bg-blue-600 text-white shadow-2xs"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200/70"
+                  }`}
+                >
+                  <span>{cat.label}</span>
+                  <span className="text-[10px] opacity-75">({cat.count})</span>
+                </button>
+              ))}
+            </div>
           </div>
 
-          {/* Selected Template Highlights Card */}
+          {/* Curated Templates Grid */}
           {(() => {
-            const currentTpl = AVAILABLE_TEMPLATES.find((t) => t.id === selectedTemplatePreview)!;
+            const filtered = TEMPLATES_REGISTRY.filter((t) => {
+              const matchesCat = selectedCategory === "all" || t.category === selectedCategory;
+              const q = templateSearch.toLowerCase().trim();
+              const matchesSearch =
+                !q ||
+                t.name.toLowerCase().includes(q) ||
+                t.tagline.toLowerCase().includes(q) ||
+                t.description.toLowerCase().includes(q) ||
+                t.bestFor.toLowerCase().includes(q);
+              return matchesCat && matchesSearch;
+            }).slice(0, 6);
+
             return (
-              <div className="bg-white rounded-2xl border border-slate-200 p-8 shadow-sm max-w-3xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-6">
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <h3 className="text-xl font-bold text-slate-900">{currentTpl.name} Template</h3>
-                    <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-blue-50 text-blue-700 border border-blue-100">
-                      {currentTpl.badge}
-                    </span>
-                  </div>
-                  <p className="text-sm text-slate-600 mb-3">{currentTpl.description}</p>
-                  <p className="text-xs text-slate-500">
-                    <strong className="text-slate-700">Best for:</strong> {currentTpl.bestFor}
-                  </p>
+              <div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
+                  {filtered.map((tpl) => (
+                    <div
+                      key={tpl.id}
+                      className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs hover:shadow-md transition flex flex-col justify-between group"
+                    >
+                      <div
+                        className="h-36 border-b border-slate-100 p-5 flex flex-col justify-center items-center relative transition"
+                        style={{ backgroundColor: `${tpl.recommendedColor}08` }}
+                      >
+                        <div
+                          className="w-10 h-10 rounded-xl flex items-center justify-center mb-1.5 shadow-2xs transition group-hover:scale-105"
+                          style={{
+                            backgroundColor: `${tpl.recommendedColor}15`,
+                            color: tpl.recommendedColor,
+                          }}
+                        >
+                          <FileText className="w-5 h-5" />
+                        </div>
+                        <span className="text-xs font-bold text-slate-800">{tpl.name}</span>
+                        <span className="absolute top-3 right-3 text-[10px] font-bold px-2 py-0.5 rounded-full bg-white text-slate-700 border border-slate-200/80 shadow-2xs">
+                          {tpl.badge}
+                        </span>
+                        <span className="absolute bottom-2.5 left-3 text-[10px] font-semibold text-emerald-700 flex items-center gap-1 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200/60">
+                          <Check className="w-3 h-3" /> ATS Safe
+                        </span>
+                      </div>
+
+                      <div className="p-4 flex-1 flex flex-col justify-between">
+                        <div>
+                          <p
+                            className="text-xs font-semibold mb-1"
+                            style={{ color: tpl.recommendedColor }}
+                          >
+                            {tpl.tagline}
+                          </p>
+                          <p className="text-xs text-slate-600 line-clamp-2 mb-2">
+                            {tpl.description}
+                          </p>
+                          <p className="text-[11px] text-slate-500 mb-4">
+                            <strong className="text-slate-700">Best for:</strong> {tpl.bestFor}
+                          </p>
+                        </div>
+
+                        <Link
+                          href={`/editor/new?template=${tpl.id}`}
+                          className="w-full inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-slate-900 hover:bg-blue-600 text-white text-xs font-bold transition shadow-xs"
+                        >
+                          Use Template
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </Link>
+                      </div>
+                    </div>
+                  ))}
                 </div>
 
-                <Link
-                  href={`/editor/new?template=${currentTpl.id}`}
-                  className="shrink-0 inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm transition shadow-xs"
-                >
-                  Use {currentTpl.name}
-                  <ArrowRight className="w-4 h-4" />
-                </Link>
+                <div className="text-center">
+                  <Link
+                    href="/templates"
+                    className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition shadow-sm"
+                  >
+                    Browse All 50 ATS Templates
+                    <ArrowRight className="w-4 h-4" />
+                  </Link>
+                </div>
               </div>
             );
           })()}

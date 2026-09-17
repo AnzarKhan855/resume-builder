@@ -1,4 +1,4 @@
-import { parseResumeText } from "../src/lib/resume-parser.js";
+import { parseResumeText } from "../src/lib/resume-parser.ts";
 import assert from "assert";
 
 console.log("=== RUNNING RESUME PARSER 17-CASE TEST SUITE ===");

@@ -10,6 +10,15 @@ export const metadata = {
   },
 };
 
-export default function NewResumePage() {
-  return <ResumeEditor initialData={INITIAL_RESUME_DATA} isNew={true} />;
+export default async function NewResumePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ template?: string }>;
+}) {
+  const { template } = await searchParams;
+  const initialData = template
+    ? { ...INITIAL_RESUME_DATA, template }
+    : INITIAL_RESUME_DATA;
+
+  return <ResumeEditor initialData={initialData} isNew={true} />;
 }

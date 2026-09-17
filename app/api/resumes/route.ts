@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import mongoose from "mongoose";
 import { connectDB, isDatabaseConfigured } from "@/src/lib/mongodb";
 import Resume from "@/src/models/Resume";
 import { normalizeResume, prepareResumeForSave } from "@/src/lib/resume-normalizer";
@@ -10,26 +11,53 @@ export async function POST(request: NextRequest) {
     const user = await getSessionUser(request);
     const body = await request.json();
 
+    // Sanitize _id: strip client-side temporary IDs (e.g. import_*) so MongoDB generates a genuine 24-char ObjectId
+    const cleanId = body._id && mongoose.isValidObjectId(body._id) ? body._id : undefined;
+
+    // Sanitize userId: must be a valid ObjectId for MongoDB reference
+    const candidateUserId = user?.userId || body.userId;
+    const cleanUserId =
+      candidateUserId && mongoose.isValidObjectId(candidateUserId) ? candidateUserId : undefined;
+
     const prepared = prepareResumeForSave({
       ...body,
-      userId: user?.userId || body.userId,
+      _id: cleanId,
+      id: cleanId,
+      userId: cleanUserId,
     });
 
     if (!isDatabaseConfigured()) {
       const saved = memoryStore.create(prepared);
       return NextResponse.json(
-        { message: "Resume saved successfully (Local Mode)", resume: saved },
+        {
+          message: "Resume saved successfully (Local Mode)",
+          resume: saved,
+          resumeId: saved._id || saved.id,
+        },
         { status: 201 }
       );
     }
 
     await connectDB();
 
-    const doc = await Resume.create(prepared);
+    const toSave: any = { ...prepared };
+    if (!toSave._id) {
+      delete toSave._id;
+      delete toSave.id;
+    }
+    if (!toSave.userId) {
+      delete toSave.userId;
+    }
+
+    const doc = await Resume.create(toSave);
     const normalized = normalizeResume(doc.toObject ? doc.toObject() : doc);
 
     return NextResponse.json(
-      { message: "Resume saved successfully", resume: normalized },
+      {
+        message: "Resume saved successfully",
+        resume: normalized,
+        resumeId: doc._id.toString(),
+      },
       { status: 201 }
     );
   } catch (error) {

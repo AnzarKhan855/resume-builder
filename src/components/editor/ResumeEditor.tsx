@@ -87,6 +87,97 @@ export default function ResumeEditor({ initialData, isNew = false }: ResumeEdito
     setLastSavedTime(now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
   }, []);
 
+  // Deterministic Precedence Hydration:
+  // 1. Server/database resume (initialData when not isDraftFallback)
+  // 2. Explicit unsaved local draft (only if newer than server or when isDraftFallback)
+  // 3. Temporary import cache (only when isDraftFallback)
+  // 4. Clean blank state
+  useEffect(() => {
+    try {
+      if (typeof window === "undefined") return;
+      const currentId = initialData._id || initialData.id;
+
+      // RULE 1: Server/database resume is canonical source of truth
+      if (!initialData.isDraftFallback && currentId) {
+        // Clear any temporary import staging so it cannot contaminate subsequent views
+        sessionStorage.removeItem("pending_import_resume");
+        localStorage.removeItem("pending_import_resume");
+
+        // Check if there is an unsaved local draft that is STRICTLY newer than the database record
+        const localDraftRaw = localStorage.getItem(`resume_draft_${currentId}`);
+        if (localDraftRaw) {
+          try {
+            const localDraft = JSON.parse(localDraftRaw);
+            if (
+              localDraft?.updatedAt &&
+              initialData.updatedAt &&
+              new Date(localDraft.updatedAt).getTime() > new Date(initialData.updatedAt).getTime() + 2000
+            ) {
+              // Local draft has more recent unsaved changes
+              setData(localDraft);
+              return;
+            }
+          } catch {}
+        }
+        // Canonical database record takes precedence
+        return;
+      }
+
+      // RULE 2 & 3: If server returned a draft fallback (e.g. offline or new draft)
+      if (initialData.isDraftFallback && currentId) {
+        // Priority 2: Check for explicit local draft matching this specific ID
+        const localDraftRaw = localStorage.getItem(`resume_draft_${currentId}`);
+        if (localDraftRaw) {
+          try {
+            const localDraft = JSON.parse(localDraftRaw);
+            if (
+              localDraft &&
+              (localDraft.personalInfo?.fullName ||
+                (localDraft.experience && localDraft.experience.length > 0) ||
+                (localDraft.education && localDraft.education.length > 0) ||
+                (localDraft.skills && localDraft.skills.length > 0))
+            ) {
+              setData(localDraft);
+              return;
+            }
+          } catch {}
+        }
+
+        // Priority 3: Check temporary import staging cache
+        const pendingImportRaw =
+          sessionStorage.getItem("pending_import_resume") ||
+          localStorage.getItem("pending_import_resume");
+
+        if (pendingImportRaw) {
+          try {
+            const parsed = JSON.parse(pendingImportRaw);
+            if (
+              parsed &&
+              (parsed.personalInfo?.fullName ||
+                (parsed.experience && parsed.experience.length > 0) ||
+                (parsed.education && parsed.education.length > 0) ||
+                (parsed.skills && parsed.skills.length > 0))
+            ) {
+              const restored: ResumeData = {
+                ...parsed,
+                _id: currentId,
+                id: currentId,
+                isDraftFallback: false,
+              };
+              setData(restored);
+              sessionStorage.removeItem("pending_import_resume");
+              localStorage.removeItem("pending_import_resume");
+              localStorage.setItem(`resume_draft_${currentId}`, JSON.stringify(restored));
+              return;
+            }
+          } catch {}
+        }
+      }
+    } catch (err) {
+      console.warn("Hydration precedence check error:", err);
+    }
+  }, [initialData]);
+
   // Save to DB and localStorage
   const performSave = useCallback(
     async (currentData: ResumeData) => {
@@ -198,6 +289,39 @@ export default function ResumeEditor({ initialData, isNew = false }: ResumeEdito
         },
       ],
     }));
+  };
+
+  const handleApplyTailoredResume = (tailoredData: ResumeData) => {
+    setData(tailoredData);
+    performSave(tailoredData);
+  };
+
+  const handleForkTailoredResume = async (forkedData: ResumeData) => {
+    const forkId = `tailored_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const preparedFork: ResumeData = {
+      ...forkedData,
+      _id: forkId,
+      id: forkId,
+      baseResumeId: data._id || data.id,
+    };
+
+    try {
+      localStorage.setItem(`resume_draft_${forkId}`, JSON.stringify(preparedFork));
+      const res = await fetch("/api/resumes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(preparedFork),
+      });
+      if (res.ok) {
+        const result = await res.json();
+        const savedId = result.resume?._id || result.resume?.id || forkId;
+        router.push(`/editor/${savedId}`);
+        return;
+      }
+    } catch (e) {
+      console.warn("Fork API save failed, opening local draft:", e);
+    }
+    router.push(`/editor/${forkId}`);
   };
 
   const handleDownloadPDF = async () => {
@@ -644,6 +768,8 @@ export default function ResumeEditor({ initialData, isNew = false }: ResumeEdito
         onClose={() => setIsJobTailorModalOpen(false)}
         data={data}
         onAddSkill={handleAddSkillFromJobTailor}
+        onApplyTailored={handleApplyTailoredResume}
+        onForkResume={handleForkTailoredResume}
       />
     </div>
   );

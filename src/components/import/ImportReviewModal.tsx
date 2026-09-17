@@ -286,7 +286,34 @@ export default function ImportReviewModal({
                 <span className="text-xs font-semibold uppercase text-slate-500">
                   {data.experience.length} Positions Extracted
                 </span>
-                {renderConfidenceBadge("experience")}
+                <div className="flex items-center gap-2">
+                  {renderConfidenceBadge("experience")}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setData((prev) => ({
+                        ...prev,
+                        experience: [
+                          ...prev.experience,
+                          {
+                            id: generateId(),
+                            company: "New Company",
+                            position: "Role / Title",
+                            startDate: "",
+                            endDate: "Present",
+                            current: true,
+                            description: "",
+                            highlights: [],
+                          },
+                        ],
+                      }))
+                    }
+                    className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-700 bg-blue-50 px-2 py-1 rounded-lg border border-blue-200"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Add Position
+                  </button>
+                </div>
               </div>
               {data.experience.length === 0 ? (
                 <p className="text-sm text-slate-400 py-6 text-center">No experience positions detected.</p>
@@ -369,7 +396,35 @@ export default function ImportReviewModal({
                 <span className="text-xs font-semibold uppercase text-slate-500">
                   {data.education.length} Academic Credentials Extracted
                 </span>
-                {renderConfidenceBadge("education")}
+                <div className="flex items-center gap-2">
+                  {renderConfidenceBadge("education")}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setData((prev) => ({
+                        ...prev,
+                        education: [
+                          ...prev.education,
+                          {
+                            id: generateId(),
+                            institution: "University / College",
+                            degree: "Bachelor of Science",
+                            fieldOfStudy: "Computer Science",
+                            startDate: "",
+                            endDate: "2024",
+                            current: false,
+                            gpa: "",
+                            achievements: [],
+                          },
+                        ],
+                      }))
+                    }
+                    className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-700 bg-blue-50 px-2 py-1 rounded-lg border border-blue-200"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Add Education
+                  </button>
+                </div>
               </div>
               {data.education.length === 0 ? (
                 <p className="text-sm text-slate-400 py-6 text-center">No education records detected.</p>
@@ -469,17 +524,91 @@ export default function ImportReviewModal({
                 <span className="text-xs font-semibold uppercase text-slate-500">
                   {data.projects.length} Projects Extracted
                 </span>
-                {renderConfidenceBadge("projects")}
+                <div className="flex items-center gap-2">
+                  {renderConfidenceBadge("projects")}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setData((prev) => ({
+                        ...prev,
+                        projects: [
+                          ...prev.projects,
+                          {
+                            id: generateId(),
+                            title: "New Project",
+                            description: "",
+                            technologies: [],
+                          },
+                        ],
+                      }))
+                    }
+                    className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-700 bg-blue-50 px-2 py-1 rounded-lg border border-blue-200"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Add Project
+                  </button>
+                </div>
               </div>
               {data.projects.length === 0 ? (
                 <p className="text-sm text-slate-400 py-6 text-center">No projects detected.</p>
               ) : (
-                data.projects.map((proj) => (
-                  <div key={proj.id} className="p-4 bg-slate-50 border border-slate-200 rounded-xl">
-                    <h4 className="font-semibold text-sm text-slate-800">{proj.title}</h4>
-                    {proj.description && (
-                      <p className="text-xs text-slate-600 mt-1 whitespace-pre-line">{proj.description}</p>
-                    )}
+                data.projects.map((proj, idx) => (
+                  <div key={proj.id} className="p-4 bg-slate-50 border border-slate-200 rounded-xl relative">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setData((prev) => ({
+                          ...prev,
+                          projects: prev.projects.filter((p) => p.id !== proj.id),
+                        }))
+                      }
+                      className="absolute top-4 right-4 text-slate-400 hover:text-red-500 transition"
+                      title="Remove project"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-2 pr-8">
+                      <div>
+                        <label className="block text-[11px] font-medium text-slate-500">Project Title</label>
+                        <input
+                          type="text"
+                          value={proj.title}
+                          onChange={(e) => {
+                            const updated = [...data.projects];
+                            updated[idx].title = e.target.value;
+                            setData({ ...data, projects: updated });
+                          }}
+                          className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-900"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-medium text-slate-500">Link / URL</label>
+                        <input
+                          type="text"
+                          value={proj.link || ""}
+                          placeholder="https://..."
+                          onChange={(e) => {
+                            const updated = [...data.projects];
+                            updated[idx].link = e.target.value;
+                            setData({ ...data, projects: updated });
+                          }}
+                          className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-900"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-medium text-slate-500">Description / Highlights</label>
+                      <textarea
+                        rows={2}
+                        value={proj.description || ""}
+                        onChange={(e) => {
+                          const updated = [...data.projects];
+                          updated[idx].description = e.target.value;
+                          setData({ ...data, projects: updated });
+                        }}
+                        className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-900"
+                      />
+                    </div>
                   </div>
                 ))
               )}
@@ -492,16 +621,89 @@ export default function ImportReviewModal({
                 <span className="text-xs font-semibold uppercase text-slate-500">
                   {data.certifications.length} Certifications Extracted
                 </span>
-                {renderConfidenceBadge("certifications")}
+                <div className="flex items-center gap-2">
+                  {renderConfidenceBadge("certifications")}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setData((prev) => ({
+                        ...prev,
+                        certifications: [
+                          ...prev.certifications,
+                          {
+                            id: generateId(),
+                            name: "New Certification",
+                            issuer: "",
+                            date: "",
+                          },
+                        ],
+                      }))
+                    }
+                    className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-700 bg-blue-50 px-2 py-1 rounded-lg border border-blue-200"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Add Certification
+                  </button>
+                </div>
               </div>
               {data.certifications.length === 0 ? (
                 <p className="text-sm text-slate-400 py-6 text-center">No certifications detected.</p>
               ) : (
-                data.certifications.map((cert) => (
-                  <div key={cert.id} className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between">
-                    <div>
-                      <h4 className="font-semibold text-sm text-slate-800">{cert.name}</h4>
-                      {cert.issuer && <p className="text-xs text-slate-500">{cert.issuer} {cert.date ? `• ${cert.date}` : ""}</p>}
+                data.certifications.map((cert, idx) => (
+                  <div key={cert.id} className="p-4 bg-slate-50 border border-slate-200 rounded-xl relative">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setData((prev) => ({
+                          ...prev,
+                          certifications: prev.certifications.filter((c) => c.id !== cert.id),
+                        }))
+                      }
+                      className="absolute top-4 right-4 text-slate-400 hover:text-red-500 transition"
+                      title="Remove certification"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pr-8">
+                      <div>
+                        <label className="block text-[11px] font-medium text-slate-500">Certificate Name</label>
+                        <input
+                          type="text"
+                          value={cert.name}
+                          onChange={(e) => {
+                            const updated = [...data.certifications];
+                            updated[idx].name = e.target.value;
+                            setData({ ...data, certifications: updated });
+                          }}
+                          className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-900"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-medium text-slate-500">Issuer / Organization</label>
+                        <input
+                          type="text"
+                          value={cert.issuer}
+                          onChange={(e) => {
+                            const updated = [...data.certifications];
+                            updated[idx].issuer = e.target.value;
+                            setData({ ...data, certifications: updated });
+                          }}
+                          className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-900"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-medium text-slate-500">Date / Year</label>
+                        <input
+                          type="text"
+                          value={cert.date}
+                          onChange={(e) => {
+                            const updated = [...data.certifications];
+                            updated[idx].date = e.target.value;
+                            setData({ ...data, certifications: updated });
+                          }}
+                          className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-900"
+                        />
+                      </div>
                     </div>
                   </div>
                 ))

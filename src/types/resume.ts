@@ -161,6 +161,11 @@ export interface ResumeData {
   sectionOrder: string[];
   customization: ResumeCustomization;
   isAtsMode?: boolean;
+  targetRole?: string;
+  jobDescription?: string;
+  baseResumeId?: string;
+  tailoredFromId?: string;
+  isDraftFallback?: boolean;
   createdAt?: string;
   updatedAt?: string;
 

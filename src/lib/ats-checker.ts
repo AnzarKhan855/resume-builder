@@ -178,7 +178,7 @@ export function auditResumeForAts(data: ResumeData): AtsAuditResult {
   });
 
   // Quantifiable metrics: numbers with %, $, k, M, or standalone numbers
-  const metricRegex = /(?:\$\s*\d+(?:\.\d+)?|\b\d+%\b|\b\d+(?:,\d{3})+\b|\b\d+\s*(?:k|m|million|billion)\b)/gi;
+  const metricRegex = /(?:\$\s*\d+(?:\.\d+)?|\b\d+(?:\.\d+)?%|\b\d+(?:,\d{3})+\b|\b\d+\s*(?:k|m|million|billion)\b)/gi;
   const metricsFound = Array.from(new Set(allText.match(metricRegex) || []));
   const hasMetrics = metricsFound.length >= 2;
   checks.push({
