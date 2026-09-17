@@ -1,14 +1,16 @@
-import {
+import type {
   ResumeData,
-  INITIAL_RESUME_DATA,
-  DEFAULT_SECTION_ORDER,
-  DEFAULT_CUSTOMIZATION,
   ExperienceItem,
   EducationItem,
   ProjectItem,
   SkillItem,
   TemplateId,
-} from "@/src/types/resume";
+} from "../types/resume";
+import {
+  INITIAL_RESUME_DATA,
+  DEFAULT_SECTION_ORDER,
+  DEFAULT_CUSTOMIZATION,
+} from "../types/resume";
 import { categorizeSkill } from "./skill-categorizer";
 
 export function generateId(): string {
@@ -197,6 +199,9 @@ export function normalizeResume(raw: any): ResumeData {
     publications: Array.isArray(raw.publications) ? raw.publications : [],
     volunteer: Array.isArray(raw.volunteer) ? raw.volunteer : [],
     coursework: Array.isArray(raw.coursework) ? raw.coursework : [],
+    awards: Array.isArray(raw.awards) ? raw.awards : [],
+    interests: Array.isArray(raw.interests) ? raw.interests : [],
+    validation: raw.validation || undefined,
     customSections: Array.isArray(raw.customSections) ? raw.customSections : [],
     sectionOrder: Array.isArray(raw.sectionOrder) && raw.sectionOrder.length > 0
       ? raw.sectionOrder

@@ -345,7 +345,7 @@ CRITICAL RULES:
           const content = aiJson.choices?.[0]?.message?.content;
           if (content) {
             const aiParsed = JSON.parse(content);
-            mergeAiParsedData(parsedData, aiParsed);
+            mergeAiParsedData(parsedData, aiParsed, extractedText);
           }
         }
       } catch (aiErr: any) {
@@ -358,6 +358,7 @@ CRITICAL RULES:
       data: parsedData,
       confidence: parsedData.confidence,
       sectionsDetected: parsedData.sectionsDetected,
+      validation: parsedData.validation,
       rawTextPreview: extractedText.substring(0, 350) + "...",
     });
   } catch (error: any) {

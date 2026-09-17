@@ -19,6 +19,7 @@ export interface ExperienceItem {
   current: boolean;
   description: string;
   highlights?: string[];
+  technologies?: string[];
 }
 
 export interface EducationItem {
@@ -59,6 +60,37 @@ export interface CertificationItem {
   issuer: string;
   date: string;
   url?: string;
+  credentialId?: string;
+}
+
+export interface AwardItem {
+  id: string;
+  title: string;
+  issuer?: string;
+  date?: string;
+  description?: string;
+}
+
+export interface InterestItem {
+  id: string;
+  name: string;
+}
+
+export interface SectionValidation {
+  section: string;
+  sourceCount: number;
+  parsedCount: number;
+  missingItems?: string[];
+  extraItems?: string[];
+  status: "PASS" | "WARN" | "FAIL";
+  message?: string;
+}
+
+export interface ParsingValidation {
+  overallStatus: "PASS" | "WARN" | "FAIL";
+  confidence: number;
+  sections: SectionValidation[];
+  warnings: string[];
 }
 
 export interface AchievementItem {
@@ -157,6 +189,9 @@ export interface ResumeData {
   publications?: PublicationItem[];
   volunteer?: VolunteerItem[];
   coursework?: CourseworkItem[];
+  awards?: AwardItem[];
+  interests?: InterestItem[];
+  validation?: ParsingValidation;
   customSections: CustomSection[];
   sectionOrder: string[];
   customization: ResumeCustomization;

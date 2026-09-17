@@ -1,4 +1,4 @@
-import { ResumeData } from "@/src/types/resume";
+import type { ResumeData } from "../types/resume";
 import { normalizeResume, generateId } from "./resume-normalizer";
 
 // In-memory store for development/demo environments when MongoDB is not connected

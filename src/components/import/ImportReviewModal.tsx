@@ -17,6 +17,7 @@ import {
   AlertTriangle,
   RotateCcw,
   Sparkles,
+  ShieldCheck,
 } from "lucide-react";
 import { generateId } from "@/src/lib/resume-normalizer";
 
@@ -44,6 +45,7 @@ export default function ImportReviewModal({
   if (!isOpen) return null;
 
   const confidence = (initialData as any).confidence;
+  const validation = (initialData as any).validation;
   const overallScore = confidence?.overall ?? 85;
 
   const handlePersonalInfoChange = (field: string, value: string) => {
@@ -113,7 +115,7 @@ export default function ImportReviewModal({
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-slate-100 bg-slate-50/50 shrink-0">
           <div>
-            <div className="flex items-center gap-2 mb-1">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
               <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
                 <Check className="w-3.5 h-3.5" />
                 Parsed Successfully
@@ -122,6 +124,12 @@ export default function ImportReviewModal({
                 <Sparkles className="w-3 h-3 text-blue-600" />
                 {overallScore}% Extraction Match
               </span>
+              {validation?.isConsistent && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-teal-50 text-teal-700 border border-teal-200/60">
+                  <ShieldCheck className="w-3 h-3 text-teal-600" />
+                  Grounded & Reconciled
+                </span>
+              )}
             </div>
             <h2 className="text-xl font-bold text-slate-900">Review & Verify Parsed Resume</h2>
             <p className="text-xs text-slate-500 mt-0.5">
@@ -139,15 +147,17 @@ export default function ImportReviewModal({
         {/* Navigation Tabs */}
         <div className="flex border-b border-slate-200 px-6 gap-2 bg-white shrink-0 overflow-x-auto no-scrollbar">
           {[
-            { id: "personal", label: "Personal Info", icon: User, count: data.personalInfo.fullName ? 1 : 0 },
-            { id: "experience", label: "Experience", icon: Briefcase, count: data.experience.length },
-            { id: "education", label: "Education", icon: GraduationCap, count: data.education.length },
-            { id: "skills", label: "Skills", icon: Code2, count: data.skills.length },
-            { id: "projects", label: "Projects", icon: FolderGit2, count: data.projects.length },
-            { id: "certifications", label: "Certifications", icon: Award, count: data.certifications.length },
+            { id: "personal", label: "Personal Info", icon: User, count: data.personalInfo.fullName ? 1 : 0, key: "personalInfo" },
+            { id: "experience", label: "Experience", icon: Briefcase, count: data.experience.length, key: "experience" },
+            { id: "education", label: "Education", icon: GraduationCap, count: data.education.length, key: "education" },
+            { id: "skills", label: "Skills", icon: Code2, count: data.skills.length, key: "skills" },
+            { id: "projects", label: "Projects", icon: FolderGit2, count: data.projects.length, key: "projects" },
+            { id: "certifications", label: "Certifications", icon: Award, count: data.certifications.length, key: "certifications" },
           ].map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
+            const secVal = validation?.sections?.[tab.key];
+            const isConsistent = secVal ? secVal.isConsistent : true;
             return (
               <button
                 key={tab.id}
@@ -167,6 +177,9 @@ export default function ImportReviewModal({
                 >
                   {tab.count}
                 </span>
+                {isConsistent && tab.count > 0 && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" title="Grounded in source document" />
+                )}
               </button>
             );
           })}

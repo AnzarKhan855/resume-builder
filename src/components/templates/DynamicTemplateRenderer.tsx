@@ -51,6 +51,8 @@ export default function DynamicTemplateRenderer({ data }: { data: ResumeData }) 
         "skills",
         "certifications",
         "achievements",
+        "awards",
+        "interests",
         "languages",
         "publications",
         "volunteer",
@@ -604,18 +606,94 @@ export default function DynamicTemplateRenderer({ data }: { data: ResumeData }) 
           </React.Fragment>
         );
 
+      case "awards":
+        if (!data.awards || data.awards.length === 0) return null;
+        return (
+          <section key="awards" className="mb-4">
+            {renderHeading("Honors & Awards")}
+            <div className="space-y-2 text-xs">
+              {data.awards.map((award) => (
+                <div key={award.id}>
+                  <div className="flex items-baseline justify-between font-semibold text-slate-800">
+                    <span>• {award.title} {award.issuer ? `— ${award.issuer}` : ""}</span>
+                    {award.date && <span className="text-slate-500 text-[11px] ml-2 shrink-0">{award.date}</span>}
+                  </div>
+                  {award.description && (
+                    <p className="text-slate-600 ml-3 text-[11px] mt-0.5">{award.description}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        );
+
+      case "interests":
+        if (!data.interests || data.interests.length === 0) return null;
+        return (
+          <section key="interests" className="mb-4">
+            {renderHeading("Interests & Activities")}
+            <div className="flex flex-wrap gap-1.5 text-xs">
+              {data.interests.map((interest) => (
+                <span
+                  key={interest.id}
+                  className="px-2 py-0.5 rounded text-slate-700 bg-slate-100 border border-slate-200/80 font-medium text-[11px]"
+                >
+                  {interest.name}
+                </span>
+              ))}
+            </div>
+          </section>
+        );
+
       default:
         return null;
     }
   };
 
+  const isLeftRail = templateDef.layoutStyle === "left-rail" && !isAtsMode;
+  const isCompact = templateDef.layoutStyle === "compact";
+
+  if (isLeftRail) {
+    const sidebarKeys = new Set([
+      "skills",
+      "education",
+      "certifications",
+      "languages",
+      "awards",
+      "interests",
+      "coursework",
+    ]);
+
+    const leftSections = sectionOrder.filter((k) => sidebarKeys.has(k));
+    const mainSections = sectionOrder.filter((k) => !sidebarKeys.has(k) && k !== "personalInfo");
+
+    return (
+      <div
+        className="w-full bg-white text-slate-900 p-8 shadow-sm transition-all"
+        style={{ fontFamily }}
+      >
+        {renderHeader()}
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-6 mt-4">
+          <aside className="md:col-span-4 space-y-1 border-r border-slate-200 pr-5">
+            {leftSections.map((key) => renderSection(key))}
+          </aside>
+          <main className="md:col-span-8 space-y-1">
+            {mainSections.map((key) => renderSection(key))}
+          </main>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
-      className="w-full bg-white text-slate-900 p-8 shadow-sm transition-all"
+      className={`w-full bg-white text-slate-900 ${
+        isCompact ? "p-6 text-[11px] leading-snug" : "p-8 text-xs leading-normal"
+      } shadow-sm transition-all`}
       style={{ fontFamily }}
     >
       {renderHeader()}
-      <main className="space-y-1">
+      <main className={isCompact ? "space-y-0.5" : "space-y-1"}>
         {sectionOrder.map((key) => renderSection(key))}
       </main>
     </div>

@@ -6,10 +6,10 @@ import {
   AlignmentType,
   BorderStyle,
 } from "docx";
-import { ResumeData } from "@/src/types/resume";
+import type { ResumeData } from "../types/resume";
 
 export function createDocxDocument(data: ResumeData): Document {
-  const { personalInfo, summary, experience, education, projects, skills, certifications, achievements, languages, publications, volunteer, coursework, customSections } = data;
+  const { personalInfo, summary, experience, education, projects, skills, certifications, achievements, awards, interests, languages, publications, volunteer, coursework, customSections } = data;
 
   const children: Paragraph[] = [];
 
@@ -394,6 +394,73 @@ export function createDocxDocument(data: ResumeData): Document {
         })
       );
     }
+  }
+
+  // 8b. Awards
+  if (awards && awards.length > 0) {
+    addSectionHeading("Honors & Awards");
+    for (const award of awards) {
+      children.push(
+        new Paragraph({
+          bullet: { level: 0 },
+          spacing: { after: 40 },
+          children: [
+            new TextRun({
+              text: award.title,
+              bold: true,
+              size: 19,
+              font: "Arial",
+              color: "111827",
+            }),
+            new TextRun({
+              text: award.issuer ? ` — ${award.issuer}` : "",
+              size: 18,
+              font: "Arial",
+              color: "4B5563",
+            }),
+            new TextRun({
+              text: award.date ? ` (${award.date})` : "",
+              size: 18,
+              font: "Arial",
+              color: "6B7280",
+            }),
+          ],
+        })
+      );
+      if (award.description) {
+        children.push(
+          new Paragraph({
+            spacing: { after: 60 },
+            children: [
+              new TextRun({
+                text: `    ${award.description}`,
+                size: 18,
+                font: "Arial",
+                color: "4B5563",
+              }),
+            ],
+          })
+        );
+      }
+    }
+  }
+
+  // 8c. Interests
+  if (interests && interests.length > 0) {
+    addSectionHeading("Interests & Activities");
+    children.push(
+      new Paragraph({
+        spacing: { after: 120 },
+        children: [
+          new TextRun({
+            text: interests.map((i) => i.name).join(", "),
+            size: 19,
+            font: "Arial",
+            color: "374151",
+          }),
+        ],
+      })
+    );
   }
 
   // 9. Languages

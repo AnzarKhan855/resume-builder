@@ -42,7 +42,9 @@ export default function TemplateRenderer({ data }: { data: ResumeData }) {
   const hasExtendedSections =
     (data.publications && data.publications.length > 0) ||
     (data.volunteer && data.volunteer.length > 0) ||
-    (data.coursework && data.coursework.length > 0);
+    (data.coursework && data.coursework.length > 0) ||
+    (data.awards && data.awards.length > 0) ||
+    (data.interests && data.interests.length > 0);
 
   if (!hasExtendedSections) {
     switch (template) {

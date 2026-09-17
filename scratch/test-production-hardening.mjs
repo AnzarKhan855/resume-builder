@@ -1,5 +1,5 @@
 import assert from "assert";
-import { NextRequest } from "next/server";
+import { NextRequest } from "next/server.js";
 import { normalizeResume } from "../src/lib/resume-normalizer.ts";
 import { TEMPLATES_REGISTRY } from "../src/lib/templates-registry.ts";
 import { createDocxDocument } from "../src/lib/docx-generator.ts";
