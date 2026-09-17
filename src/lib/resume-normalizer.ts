@@ -193,11 +193,15 @@ export function normalizeResume(raw: any): ResumeData {
     certifications: Array.isArray(raw.certifications) ? raw.certifications : [],
     achievements: Array.isArray(raw.achievements) ? raw.achievements : [],
     languages: Array.isArray(raw.languages) ? raw.languages : [],
+    publications: Array.isArray(raw.publications) ? raw.publications : [],
+    volunteer: Array.isArray(raw.volunteer) ? raw.volunteer : [],
+    coursework: Array.isArray(raw.coursework) ? raw.coursework : [],
     customSections: Array.isArray(raw.customSections) ? raw.customSections : [],
     sectionOrder: Array.isArray(raw.sectionOrder) && raw.sectionOrder.length > 0
       ? raw.sectionOrder
       : DEFAULT_SECTION_ORDER,
     customization,
+    isAtsMode: Boolean(raw.isAtsMode),
     createdAt: raw.createdAt ? new Date(raw.createdAt).toISOString() : new Date().toISOString(),
     updatedAt: raw.updatedAt ? new Date(raw.updatedAt).toISOString() : new Date().toISOString(),
 

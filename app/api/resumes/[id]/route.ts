@@ -101,13 +101,23 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
+    const user = await getSessionUser(request);
 
     if (!isDatabaseConfigured()) {
+      const existing = memoryStore.getById(id);
+      if (existing?.userId && user?.userId && existing.userId !== user.userId) {
+        return NextResponse.json({ message: "Forbidden: You do not own this resume" }, { status: 403 });
+      }
       const success = memoryStore.delete(id);
       return NextResponse.json({ message: "Resume deleted successfully", success });
     }
 
     await connectDB();
+    const existing = await Resume.findById(id);
+    if (existing?.userId && user?.userId && existing.userId.toString() !== user.userId) {
+      return NextResponse.json({ message: "Forbidden: You do not own this resume" }, { status: 403 });
+    }
+
     await Resume.findByIdAndDelete(id);
     memoryStore.delete(id);
 

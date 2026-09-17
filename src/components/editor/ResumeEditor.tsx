@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -17,13 +17,22 @@ import SectionEducation from "./SectionEducation";
 import SectionProjects from "./SectionProjects";
 import SectionSkills from "./SectionSkills";
 import SectionCertifications from "./SectionCertifications";
+import SectionAchievements from "./SectionAchievements";
 import SectionLanguages from "./SectionLanguages";
+import SectionPublications from "./SectionPublications";
+import SectionVolunteer from "./SectionVolunteer";
+import SectionCoursework from "./SectionCoursework";
 import SectionCustom from "./SectionCustom";
 import SectionReorder from "./SectionReorder";
 import CompletenessMeter from "./CompletenessMeter";
 import CustomizationDrawer from "./CustomizationDrawer";
-import TemplateRenderer, { AVAILABLE_TEMPLATES } from "../templates/TemplateRenderer";
+import AtsCheckerModal from "./AtsCheckerModal";
+import JobTailorModal from "./JobTailorModal";
+import TemplateRenderer from "../templates/TemplateRenderer";
 import { downloadResumePDF, printResume } from "@/src/lib/pdf-generator";
+import { downloadResumeDOCX } from "@/src/lib/docx-generator";
+import { auditResumeForAts } from "@/src/lib/ats-checker";
+import { generateId } from "@/src/lib/resume-normalizer";
 import {
   ArrowLeft,
   Download,
@@ -38,6 +47,11 @@ import {
   Sparkles,
   Eye,
   Edit3,
+  ShieldCheck,
+  Target,
+  FileDown,
+  ToggleLeft,
+  ToggleRight,
 } from "lucide-react";
 
 interface ResumeEditorProps {
@@ -52,7 +66,10 @@ export default function ResumeEditor({ initialData, isNew = false }: ResumeEdito
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "error">("saved");
   const [lastSavedTime, setLastSavedTime] = useState<string>("");
   const [isCustomizerOpen, setIsCustomizerOpen] = useState(false);
+  const [isAtsModalOpen, setIsAtsModalOpen] = useState(false);
+  const [isJobTailorModalOpen, setIsJobTailorModalOpen] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isDownloadingDocx, setIsDownloadingDocx] = useState(false);
   const [zoomLevel, setZoomLevel] = useState<number>(0.9);
   const [mobileView, setMobileView] = useState<"edit" | "preview">("edit");
   const [isDuplicating, setIsDuplicating] = useState(false);
@@ -61,6 +78,9 @@ export default function ResumeEditor({ initialData, isNew = false }: ResumeEdito
   const isFirstRender = useRef(true);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Dynamic ATS audit calculation
+  const atsScore = useMemo(() => auditResumeForAts(data).score, [data]);
+
   // Format time
   useEffect(() => {
     const now = new Date();
@@ -68,50 +88,52 @@ export default function ResumeEditor({ initialData, isNew = false }: ResumeEdito
   }, []);
 
   // Save to DB and localStorage
-  const performSave = async (currentData: ResumeData) => {
-    setSaveStatus("saving");
+  const performSave = useCallback(
+    async (currentData: ResumeData) => {
+      setSaveStatus("saving");
 
-    // Local draft backup
-    try {
-      const storageKey = `resume_draft_${currentData._id || currentData.id || "temp"}`;
-      localStorage.setItem(storageKey, JSON.stringify(currentData));
-    } catch (e) {
-      console.warn("LocalStorage save error:", e);
-    }
-
-    try {
-      const resumeId = currentData._id || currentData.id;
-      let url = "/api/resumes";
-      let method = "POST";
-
-      if (resumeId && !isNew) {
-        url = `/api/resumes/${resumeId}`;
-        method = "PUT";
+      // Local draft backup
+      try {
+        const storageKey = `resume_draft_${currentData._id || currentData.id || "temp"}`;
+        localStorage.setItem(storageKey, JSON.stringify(currentData));
+      } catch (e) {
+        console.warn("LocalStorage save error:", e);
       }
 
-      const res = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(currentData),
-      });
+      try {
+        const resumeId = currentData._id || currentData.id;
+        let url = "/api/resumes";
+        let method = "POST";
 
-      if (res.ok) {
-        const result = await res.json();
-        if (isNew && result.resume?._id) {
-          // Redirect to the assigned ID
-          router.replace(`/editor/${result.resume._id}`);
+        if (resumeId && !isNew) {
+          url = `/api/resumes/${resumeId}`;
+          method = "PUT";
         }
-        setSaveStatus("saved");
-        const now = new Date();
-        setLastSavedTime(now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
-      } else {
-        setSaveStatus("error");
+
+        const res = await fetch(url, {
+          method,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(currentData),
+        });
+
+        if (res.ok) {
+          const result = await res.json();
+          if (isNew && result.resume?._id) {
+            router.replace(`/editor/${result.resume._id}`);
+          }
+          setSaveStatus("saved");
+          const now = new Date();
+          setLastSavedTime(now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
+        } else {
+          setSaveStatus("error");
+        }
+      } catch (err) {
+        console.error("Auto-save error:", err);
+        setSaveStatus("saved"); // Keep silent local draft
       }
-    } catch (err) {
-      console.error("Auto-save error:", err);
-      setSaveStatus("saved"); // Keep silent local draft
-    }
-  };
+    },
+    [isNew, router]
+  );
 
   // Debounced auto-save on state change
   useEffect(() => {
@@ -132,7 +154,7 @@ export default function ResumeEditor({ initialData, isNew = false }: ResumeEdito
     return () => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     };
-  }, [data]);
+  }, [data, performSave]);
 
   // Handlers
   const handlePersonalInfoChange = (field: keyof PersonalInfo, value: string) => {
@@ -156,11 +178,45 @@ export default function ResumeEditor({ initialData, isNew = false }: ResumeEdito
     }));
   };
 
+  const handleToggleAtsMode = (enabled: boolean) => {
+    setData((prev) => ({
+      ...prev,
+      isAtsMode: enabled,
+    }));
+  };
+
+  const handleAddSkillFromJobTailor = (skillName: string) => {
+    setData((prev) => ({
+      ...prev,
+      skills: [
+        ...prev.skills,
+        {
+          id: generateId(),
+          name: skillName,
+          category: "Technical",
+          level: "Intermediate",
+        },
+      ],
+    }));
+  };
+
   const handleDownloadPDF = async () => {
     setIsDownloading(true);
     const filename = `${data.personalInfo.fullName || "Resume"}_Resume`.replace(/\s+/g, "_");
     await downloadResumePDF("resume-preview", filename);
     setIsDownloading(false);
+  };
+
+  const handleDownloadDOCX = async () => {
+    setIsDownloadingDocx(true);
+    try {
+      await downloadResumeDOCX(data);
+    } catch (err) {
+      console.error("DOCX export error:", err);
+      alert("Failed to export Word document. Please try again.");
+    } finally {
+      setIsDownloadingDocx(false);
+    }
   };
 
   const handleDuplicate = async () => {
@@ -176,7 +232,7 @@ export default function ResumeEditor({ initialData, isNew = false }: ResumeEdito
       } else {
         alert("Failed to duplicate resume");
       }
-    } catch (err) {
+    } catch {
       alert("Error duplicating resume");
     } finally {
       setIsDuplicating(false);
@@ -191,7 +247,11 @@ export default function ResumeEditor({ initialData, isNew = false }: ResumeEdito
     projects: data.projects.length,
     skills: data.skills.length,
     certifications: data.certifications.length,
+    achievements: (data.achievements || []).length,
     languages: data.languages.length,
+    publications: (data.publications || []).length,
+    volunteer: (data.volunteer || []).length,
+    coursework: (data.coursework || []).length,
     customSections: data.customSections.length,
   };
 
@@ -214,7 +274,7 @@ export default function ResumeEditor({ initialData, isNew = false }: ResumeEdito
               type="text"
               value={data.title}
               onChange={(e) => setData({ ...data, title: e.target.value })}
-              className="text-sm font-bold text-slate-900 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-none transition py-0.5 px-1 max-w-[220px] sm:max-w-xs"
+              className="text-sm font-bold text-slate-900 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-none transition py-0.5 px-1 max-w-[200px] sm:max-w-xs"
               placeholder="Resume Title"
             />
             <Edit3 className="w-3.5 h-3.5 text-slate-300 group-hover:text-slate-500 transition shrink-0" />
@@ -263,18 +323,53 @@ export default function ResumeEditor({ initialData, isNew = false }: ResumeEdito
             </button>
           </div>
 
-          {/* Template Quick Switcher */}
-          <select
-            value={data.template}
-            onChange={(e) => handleSelectTemplate(e.target.value as TemplateId)}
-            className="hidden sm:block text-xs font-semibold bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-slate-700 hover:bg-slate-100 transition"
+          {/* ATS Audit Score Button */}
+          <button
+            type="button"
+            onClick={() => setIsAtsModalOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 hover:bg-slate-100 text-xs font-semibold text-slate-800 transition"
+            title="Run ATS Compliance Audit"
           >
-            {AVAILABLE_TEMPLATES.map((t) => (
-              <option key={t.id} value={t.id}>
-                Template: {t.name}
-              </option>
-            ))}
-          </select>
+            <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
+            <span className="hidden sm:inline">ATS Score:</span>
+            <span
+              className={`font-bold ${
+                atsScore >= 80 ? "text-emerald-700" : atsScore >= 60 ? "text-blue-700" : "text-amber-700"
+              }`}
+            >
+              {atsScore}%
+            </span>
+          </button>
+
+          {/* Job Tailor Button */}
+          <button
+            type="button"
+            onClick={() => setIsJobTailorModalOpen(true)}
+            className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 hover:bg-slate-100 text-xs font-semibold text-slate-700 transition"
+            title="Tailor resume to a job description"
+          >
+            <Target className="w-3.5 h-3.5 text-indigo-600" />
+            <span>Tailor Job</span>
+          </button>
+
+          {/* Strict ATS Mode Toggle */}
+          <button
+            type="button"
+            onClick={() => handleToggleAtsMode(!data.isAtsMode)}
+            className={`hidden lg:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition ${
+              data.isAtsMode
+                ? "bg-emerald-50 border-emerald-300 text-emerald-800"
+                : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+            }`}
+            title="Toggle strict ATS single-column mode"
+          >
+            {data.isAtsMode ? (
+              <ToggleRight className="w-4 h-4 text-emerald-600" />
+            ) : (
+              <ToggleLeft className="w-4 h-4 text-slate-400" />
+            )}
+            <span>ATS Mode</span>
+          </button>
 
           {/* Customize Drawer Toggle */}
           <button
@@ -283,7 +378,7 @@ export default function ResumeEditor({ initialData, isNew = false }: ResumeEdito
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 text-xs font-semibold transition"
           >
             <SlidersHorizontal className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Customize</span>
+            <span className="hidden sm:inline">Templates & Style</span>
           </button>
 
           {/* Duplicate Resume */}
@@ -291,7 +386,7 @@ export default function ResumeEditor({ initialData, isNew = false }: ResumeEdito
             type="button"
             onClick={handleDuplicate}
             disabled={isDuplicating || isNew}
-            className="hidden md:inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-medium transition disabled:opacity-40"
+            className="hidden xl:inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-medium transition disabled:opacity-40"
             title="Duplicate Resume"
           >
             <Copy className="w-3.5 h-3.5" />
@@ -307,36 +402,56 @@ export default function ResumeEditor({ initialData, isNew = false }: ResumeEdito
             <Printer className="w-3.5 h-3.5" />
           </button>
 
+          {/* Download DOCX */}
+          <button
+            type="button"
+            onClick={handleDownloadDOCX}
+            disabled={isDownloadingDocx}
+            className="hidden sm:inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 text-xs font-semibold transition disabled:opacity-50"
+            title="Export native Microsoft Word (.docx)"
+          >
+            <FileDown className="w-3.5 h-3.5 text-blue-600" />
+            <span>{isDownloadingDocx ? "..." : "DOCX"}</span>
+          </button>
+
           {/* Download PDF Button */}
           <button
             type="button"
             onClick={handleDownloadPDF}
             disabled={isDownloading}
-            className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs transition disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs transition disabled:opacity-50"
           >
             <Download className="w-3.5 h-3.5" />
-            <span>{isDownloading ? "Generating..." : "Download PDF"}</span>
+            <span>{isDownloading ? "..." : "PDF"}</span>
           </button>
         </div>
       </header>
 
-      {/* Main Workspace Layout */}
+      {/* Main Split Interface */}
       <div className="flex-1 flex overflow-hidden">
-        {/* LEFT COLUMN: Section Editor */}
+        {/* LEFT COLUMN: Editor Panels */}
         <div
-          className={`w-full lg:w-1/2 flex flex-col border-r border-slate-200 bg-white ${
+          className={`w-full lg:w-1/2 flex flex-col bg-white border-r border-slate-200 ${
             mobileView === "edit" ? "flex" : "hidden lg:flex"
           }`}
         >
-          {/* Section Navigation Tabs */}
-          <SectionNavigation activeTab={activeTab} onSelectTab={setActiveTab} counts={counts} />
+          {/* Section Tabs Navigation */}
+          <SectionNavigation
+            activeTab={activeTab}
+            onSelectTab={setActiveTab}
+            counts={counts}
+          />
 
-          {/* Scrollable Form Content */}
-          <div className="flex-1 overflow-y-auto p-4 sm:p-6">
-            <CompletenessMeter data={data} />
+          {/* Completeness Meter */}
+          <CompletenessMeter data={data} />
 
+          {/* Tab Form Content */}
+          <div className="flex-1 overflow-y-auto p-6 space-y-6">
             {activeTab === "personalInfo" && (
-              <SectionPersonalInfo data={data.personalInfo} onChange={handlePersonalInfoChange} />
+              <SectionPersonalInfo
+                data={data.personalInfo}
+                onChange={handlePersonalInfoChange}
+              />
             )}
 
             {activeTab === "summary" && (
@@ -381,10 +496,38 @@ export default function ResumeEditor({ initialData, isNew = false }: ResumeEdito
               />
             )}
 
+            {activeTab === "achievements" && (
+              <SectionAchievements
+                items={data.achievements || []}
+                onChange={(achievements) => setData({ ...data, achievements })}
+              />
+            )}
+
             {activeTab === "languages" && (
               <SectionLanguages
                 items={data.languages}
                 onChange={(languages) => setData({ ...data, languages })}
+              />
+            )}
+
+            {activeTab === "publications" && (
+              <SectionPublications
+                items={data.publications || []}
+                onChange={(publications) => setData({ ...data, publications })}
+              />
+            )}
+
+            {activeTab === "volunteer" && (
+              <SectionVolunteer
+                items={data.volunteer || []}
+                onChange={(volunteer) => setData({ ...data, volunteer })}
+              />
+            )}
+
+            {activeTab === "coursework" && (
+              <SectionCoursework
+                items={data.coursework || []}
+                onChange={(coursework) => setData({ ...data, coursework })}
               />
             )}
 
@@ -414,10 +557,17 @@ export default function ResumeEditor({ initialData, isNew = false }: ResumeEdito
           <div className="p-2.5 px-4 bg-slate-100 border-b border-slate-200 flex items-center justify-between text-xs text-slate-600">
             <div className="flex items-center gap-2">
               <span className="font-semibold text-slate-800">Live Preview</span>
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100/80 text-emerald-800 font-medium text-[10px]">
-                <Sparkles className="w-2.5 h-2.5" />
-                ATS-Optimized Structure
-              </span>
+              {data.isAtsMode ? (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[10px]">
+                  <ShieldCheck className="w-3 h-3" />
+                  Strict ATS Single-Column
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100/80 text-blue-800 font-medium text-[10px]">
+                  <Sparkles className="w-2.5 h-2.5" />
+                  Live Reactive Renderer
+                </span>
+              )}
             </div>
 
             {/* Zoom Controls */}
@@ -462,7 +612,7 @@ export default function ResumeEditor({ initialData, isNew = false }: ResumeEdito
                 transformOrigin: "top center",
                 transition: "transform 0.15s ease-out",
               }}
-              className="origin-top"
+              className="origin-top max-w-full"
             >
               <TemplateRenderer data={data} />
             </div>
@@ -478,6 +628,22 @@ export default function ResumeEditor({ initialData, isNew = false }: ResumeEdito
         currentTemplate={data.template}
         onUpdateCustomization={handleUpdateCustomization}
         onSelectTemplate={handleSelectTemplate}
+      />
+
+      {/* ATS Checker & Quality Audit Modal */}
+      <AtsCheckerModal
+        isOpen={isAtsModalOpen}
+        onClose={() => setIsAtsModalOpen(false)}
+        data={data}
+        onToggleAtsMode={handleToggleAtsMode}
+      />
+
+      {/* Job Description Tailor Modal */}
+      <JobTailorModal
+        isOpen={isJobTailorModalOpen}
+        onClose={() => setIsJobTailorModalOpen(false)}
+        data={data}
+        onAddSkill={handleAddSkillFromJobTailor}
       />
     </div>
   );

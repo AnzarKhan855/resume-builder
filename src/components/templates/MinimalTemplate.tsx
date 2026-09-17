@@ -2,7 +2,7 @@ import React from "react";
 import { ResumeData } from "@/src/types/resume";
 
 export default function MinimalTemplate({ data }: { data: ResumeData }) {
-  const { personalInfo, summary, experience, education, projects, skills, certifications, achievements, languages, customSections, sectionOrder, customization } = data;
+  const { personalInfo, summary, experience, education, projects, skills, certifications, languages, customSections, sectionOrder, customization } = data;
 
   const accentColor = customization?.accentColor || "#0f172a";
   const fontFamily = customization?.fontFamily || "var(--font-geist-sans), sans-serif";

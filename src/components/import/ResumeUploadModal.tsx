@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useRef } from "react";
-import { X, UploadCloud, FileText, AlertCircle, Loader2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { X, UploadCloud, FileText, AlertCircle, Sparkles, RefreshCw, PenTool } from "lucide-react";
 import { ResumeData } from "@/src/types/resume";
 
 interface ResumeUploadModalProps {
@@ -15,10 +16,12 @@ export default function ResumeUploadModal({
   onClose,
   onSuccess,
 }: ResumeUploadModalProps) {
+  const router = useRouter();
   const [isDragging, setIsDragging] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isScannedPdf, setIsScannedPdf] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!isOpen) return null;
@@ -49,6 +52,8 @@ export default function ResumeUploadModal({
 
   const handleFileSelected = (selectedFile: File) => {
     setError(null);
+    setIsScannedPdf(false);
+
     const validExtensions = [".pdf", ".docx", ".doc"];
     const hasValidExt = validExtensions.some((ext) =>
       selectedFile.name.toLowerCase().endsWith(ext)
@@ -71,6 +76,7 @@ export default function ResumeUploadModal({
   const uploadAndParse = async (targetFile: File) => {
     setIsUploading(true);
     setError(null);
+    setIsScannedPdf(false);
 
     const formData = new FormData();
     formData.append("file", targetFile);
@@ -84,6 +90,14 @@ export default function ResumeUploadModal({
       const result = await response.json();
 
       if (!response.ok) {
+        if (result.isScanned) {
+          setIsScannedPdf(true);
+          setError(
+            result.message ||
+              "This PDF appears to be an image scan or flattened graphical file without selectable text."
+          );
+          return;
+        }
         throw new Error(result.message || "Failed to analyze resume.");
       }
 
@@ -95,12 +109,29 @@ export default function ResumeUploadModal({
     }
   };
 
+  const resetUpload = () => {
+    setError(null);
+    setIsScannedPdf(false);
+    setFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const handleBuildFromScratch = () => {
+    onClose();
+    router.push("/editor/new");
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
       <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-slate-100 bg-slate-50/50">
           <div>
+            <div className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-blue-600 mb-1">
+              <Sparkles className="w-3.5 h-3.5" /> 2026 Production Parser
+            </div>
             <h2 className="text-xl font-bold text-slate-900">Import Existing Resume</h2>
             <p className="text-sm text-slate-500 mt-0.5">
               Upload your PDF or DOCX resume to auto-fill your fields
@@ -117,15 +148,53 @@ export default function ResumeUploadModal({
 
         {/* Content */}
         <div className="p-6">
-          {error && (
+          {error && isScannedPdf ? (
+            <div className="mb-5 p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-900">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                <div>
+                  <h4 className="font-bold text-sm text-amber-900">Image or Scanned PDF Detected</h4>
+                  <p className="text-xs text-amber-700 mt-1 leading-relaxed">{error}</p>
+                  <p className="text-xs text-amber-800 mt-2 font-medium">
+                    Recommendation: Upload a text-selectable PDF/Word document, or create a clean ATS-friendly resume from scratch.
+                  </p>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={resetUpload}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white border border-amber-300 text-amber-900 hover:bg-amber-100/50 transition shadow-2xs"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      Try Another File
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleBuildFromScratch}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-600 text-white hover:bg-amber-700 transition shadow-2xs"
+                    >
+                      <PenTool className="w-3.5 h-3.5" />
+                      Build From Scratch
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : error ? (
             <div className="mb-5 p-3.5 rounded-xl bg-red-50 border border-red-200 text-sm text-red-600 flex items-start gap-2.5">
               <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
               <div>
                 <p className="font-semibold">Upload failed</p>
                 <p className="text-xs text-red-500 mt-0.5">{error}</p>
+                <button
+                  type="button"
+                  onClick={resetUpload}
+                  className="mt-2 text-xs font-semibold text-red-700 underline hover:no-underline flex items-center gap-1"
+                >
+                  <RefreshCw className="w-3 h-3" /> Retry with another file
+                </button>
               </div>
             </div>
-          )}
+          ) : null}
 
           {isUploading ? (
             <div className="py-12 flex flex-col items-center justify-center text-center">
@@ -174,7 +243,7 @@ export default function ResumeUploadModal({
                 />
               </div>
 
-              {file && (
+              {file && !isScannedPdf && !error && (
                 <div className="mt-4 p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <FileText className="w-5 h-5 text-blue-600" />

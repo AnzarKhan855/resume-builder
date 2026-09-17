@@ -14,6 +14,9 @@ const SECTION_LABELS: { [key: string]: string } = {
   certifications: "Certifications & Licenses",
   achievements: "Honors & Achievements",
   languages: "Languages",
+  publications: "Publications & Research",
+  volunteer: "Volunteer Experience",
+  coursework: "Relevant Coursework",
   customSections: "Custom Sections",
 };
 

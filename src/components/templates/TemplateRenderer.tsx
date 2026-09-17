@@ -1,5 +1,7 @@
 import React from "react";
 import { ResumeData } from "@/src/types/resume";
+import { TEMPLATES_REGISTRY, TemplateCategory } from "@/src/lib/templates-registry";
+import DynamicTemplateRenderer from "./DynamicTemplateRenderer";
 import ClassicTemplate from "./ClassicTemplate";
 import ModernTemplate from "./ModernTemplate";
 import MinimalTemplate from "./MinimalTemplate";
@@ -9,6 +11,7 @@ import TechnicalTemplate from "./TechnicalTemplate";
 export interface TemplateInfo {
   id: string;
   name: string;
+  category?: TemplateCategory;
   tagline: string;
   description: string;
   badge: string;
@@ -16,71 +19,49 @@ export interface TemplateInfo {
   recommendedColor: string;
 }
 
-export const AVAILABLE_TEMPLATES: TemplateInfo[] = [
-  {
-    id: "classic",
-    name: "Classic",
-    tagline: "The timeless ATS standard",
-    description: "Traditional serif layout with centered headers and clean horizontal rules. High pass rate through ATS screening.",
-    badge: "ATS Gold Standard",
-    bestFor: "Corporate, Academia, Law, Healthcare, Banking",
-    recommendedColor: "#1e3a8a",
-  },
-  {
-    id: "modern",
-    name: "Modern",
-    tagline: "Sleek and well-structured",
-    description: "Contemporary sans-serif typography with vertical accent border lines and date badges.",
-    badge: "Most Popular",
-    bestFor: "Product Managers, Marketers, Designers, Sales",
-    recommendedColor: "#2563eb",
-  },
-  {
-    id: "minimal",
-    name: "Minimal",
-    tagline: "Whitespace and typographic clarity",
-    description: "Ultra-clean two-column structure with subtle labels and generous breathing room.",
-    badge: "Recruiter Favorite",
-    bestFor: "Executives, Writers, Analysts, Creatives",
-    recommendedColor: "#0f172a",
-  },
-  {
-    id: "professional",
-    name: "Professional",
-    tagline: "Executive presence and authority",
-    description: "Prominent top header band with grid layout for competencies and leadership achievements.",
-    badge: "Executive Pick",
-    bestFor: "Consultants, Directors, Executives, Finance",
-    recommendedColor: "#065f46",
-  },
-  {
-    id: "technical",
-    name: "Technical",
-    tagline: "Engineered for developers",
-    description: "Monospace highlights, categorized tech stacks, GitHub callouts, and project architecture summaries.",
-    badge: "Software / IT",
-    bestFor: "Software Engineers, DevOps, Data Scientists, Architects",
-    recommendedColor: "#0284c7",
-  },
-];
+export const AVAILABLE_TEMPLATES: TemplateInfo[] = TEMPLATES_REGISTRY.map((t) => ({
+  id: t.id,
+  name: t.name,
+  category: t.category,
+  tagline: t.tagline,
+  description: t.description,
+  badge: t.badge,
+  bestFor: t.bestFor,
+  recommendedColor: t.recommendedColor,
+}));
 
 export default function TemplateRenderer({ data }: { data: ResumeData }) {
   const template = data.template || "classic";
 
-  switch (template) {
-    case "modern":
-    case "blue":
-      return <ModernTemplate data={data} />;
-    case "minimal":
-      return <MinimalTemplate data={data} />;
-    case "professional":
-    case "dark":
-    case "green":
-      return <ProfessionalTemplate data={data} />;
-    case "technical":
-      return <TechnicalTemplate data={data} />;
-    case "classic":
-    default:
-      return <ClassicTemplate data={data} />;
+  // If in strict ATS mode or if it's one of the 50 registry templates, use DynamicTemplateRenderer
+  if (data.isAtsMode) {
+    return <DynamicTemplateRenderer data={data} />;
   }
+
+  // Check if it's one of the original 5 base templates and has no newly added extended sections
+  const hasExtendedSections =
+    (data.publications && data.publications.length > 0) ||
+    (data.volunteer && data.volunteer.length > 0) ||
+    (data.coursework && data.coursework.length > 0);
+
+  if (!hasExtendedSections) {
+    switch (template) {
+      case "modern":
+      case "blue":
+        return <ModernTemplate data={data} />;
+      case "minimal":
+        return <MinimalTemplate data={data} />;
+      case "professional":
+      case "dark":
+      case "green":
+        return <ProfessionalTemplate data={data} />;
+      case "technical":
+        return <TechnicalTemplate data={data} />;
+      case "classic":
+        return <ClassicTemplate data={data} />;
+    }
+  }
+
+  // Universal dynamic renderer for all 50 templates
+  return <DynamicTemplateRenderer data={data} />;
 }

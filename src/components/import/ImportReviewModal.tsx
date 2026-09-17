@@ -2,14 +2,30 @@
 
 import React, { useState } from "react";
 import { ResumeData } from "@/src/types/resume";
-import { X, Check, ArrowRight, User, Briefcase, GraduationCap, Code2, Plus, Trash2 } from "lucide-react";
+import {
+  X,
+  Check,
+  ArrowRight,
+  User,
+  Briefcase,
+  GraduationCap,
+  Code2,
+  FolderGit2,
+  Award,
+  Plus,
+  Trash2,
+  AlertTriangle,
+  RotateCcw,
+  Sparkles,
+} from "lucide-react";
 import { generateId } from "@/src/lib/resume-normalizer";
 
 interface ImportReviewModalProps {
   isOpen: boolean;
-  initialData: ResumeData;
+  initialData: ResumeData & { confidence?: any };
   onClose: () => void;
   onConfirm: (finalData: ResumeData) => void;
+  onStartOver?: () => void;
 }
 
 export default function ImportReviewModal({
@@ -17,12 +33,18 @@ export default function ImportReviewModal({
   initialData,
   onClose,
   onConfirm,
+  onStartOver,
 }: ImportReviewModalProps) {
   const [data, setData] = useState<ResumeData>(initialData);
-  const [activeTab, setActiveTab] = useState<"personal" | "experience" | "education" | "skills">("personal");
+  const [activeTab, setActiveTab] = useState<
+    "personal" | "experience" | "education" | "skills" | "projects" | "certifications"
+  >("personal");
   const [newSkill, setNewSkill] = useState("");
 
   if (!isOpen) return null;
+
+  const confidence = (initialData as any).confidence;
+  const overallScore = confidence?.overall ?? 85;
 
   const handlePersonalInfoChange = (field: string, value: string) => {
     setData((prev) => ({
@@ -65,19 +87,45 @@ export default function ImportReviewModal({
     }));
   };
 
+  const renderConfidenceBadge = (fieldName: string, label?: string) => {
+    const fieldConf = confidence?.fields?.[fieldName];
+    const isHigh = fieldConf ? fieldConf.confidence === "high" : true;
+
+    if (isHigh) {
+      return (
+        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200/70 px-2 py-0.5 rounded-full">
+          <Check className="w-3 h-3 text-emerald-600" />
+          {label || "High Confidence"}
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200/70 px-2 py-0.5 rounded-full">
+        <AlertTriangle className="w-3 h-3 text-amber-600" />
+        {label || "Needs Review"}
+      </span>
+    );
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
       <div className="relative w-full max-w-3xl max-h-[90vh] bg-white rounded-2xl shadow-2xl border border-slate-100 flex flex-col overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-slate-100 bg-slate-50/50 shrink-0">
           <div>
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 mb-1 border border-emerald-200/60">
-              <Check className="w-3.5 h-3.5" />
-              Resume Extracted
+            <div className="flex items-center gap-2 mb-1">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+                <Check className="w-3.5 h-3.5" />
+                Parsed Successfully
+              </span>
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200/60">
+                <Sparkles className="w-3 h-3 text-blue-600" />
+                {overallScore}% Extraction Match
+              </span>
             </div>
-            <h2 className="text-xl font-bold text-slate-900">Review & Correct Extracted Information</h2>
+            <h2 className="text-xl font-bold text-slate-900">Review & Verify Parsed Resume</h2>
             <p className="text-xs text-slate-500 mt-0.5">
-              Verify your information before loading it into the live editor. You can always edit later.
+              Confirm or refine your extracted information before importing it into the live editor.
             </p>
           </div>
           <button
@@ -89,12 +137,14 @@ export default function ImportReviewModal({
         </div>
 
         {/* Navigation Tabs */}
-        <div className="flex border-b border-slate-200 px-6 gap-2 bg-white shrink-0 overflow-x-auto">
+        <div className="flex border-b border-slate-200 px-6 gap-2 bg-white shrink-0 overflow-x-auto no-scrollbar">
           {[
             { id: "personal", label: "Personal Info", icon: User, count: data.personalInfo.fullName ? 1 : 0 },
             { id: "experience", label: "Experience", icon: Briefcase, count: data.experience.length },
             { id: "education", label: "Education", icon: GraduationCap, count: data.education.length },
             { id: "skills", label: "Skills", icon: Code2, count: data.skills.length },
+            { id: "projects", label: "Projects", icon: FolderGit2, count: data.projects.length },
+            { id: "certifications", label: "Certifications", icon: Award, count: data.certifications.length },
           ].map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -102,16 +152,16 @@ export default function ImportReviewModal({
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
-                className={`flex items-center gap-2 py-3 px-3 text-sm font-medium border-b-2 transition whitespace-nowrap ${
+                className={`flex items-center gap-1.5 py-3 px-3 text-xs font-semibold border-b-2 transition whitespace-nowrap ${
                   isActive
                     ? "border-blue-600 text-blue-600"
                     : "border-transparent text-slate-500 hover:text-slate-700"
                 }`}
               >
-                <Icon className="w-4 h-4" />
+                <Icon className="w-3.5 h-3.5" />
                 <span>{tab.label}</span>
                 <span
-                  className={`text-xs px-1.5 py-0.5 rounded-full ${
+                  className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
                     isActive ? "bg-blue-100 text-blue-700" : "bg-slate-100 text-slate-600"
                   }`}
                 >
@@ -128,9 +178,12 @@ export default function ImportReviewModal({
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold uppercase text-slate-600 mb-1">
-                    Full Name
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-semibold uppercase text-slate-600">
+                      Full Name
+                    </label>
+                    {renderConfidenceBadge("fullName")}
+                  </div>
                   <input
                     type="text"
                     value={data.personalInfo.fullName}
@@ -139,9 +192,12 @@ export default function ImportReviewModal({
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold uppercase text-slate-600 mb-1">
-                    Job Title / Professional Headline
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-semibold uppercase text-slate-600">
+                      Professional Headline / Role
+                    </label>
+                    {renderConfidenceBadge("jobTitle")}
+                  </div>
                   <input
                     type="text"
                     value={data.personalInfo.jobTitle || ""}
@@ -149,10 +205,16 @@ export default function ImportReviewModal({
                     className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:bg-white focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold uppercase text-slate-600 mb-1">
-                    Email Address
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-semibold uppercase text-slate-600">
+                      Email Address
+                    </label>
+                    {renderConfidenceBadge("email")}
+                  </div>
                   <input
                     type="email"
                     value={data.personalInfo.email}
@@ -161,13 +223,33 @@ export default function ImportReviewModal({
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold uppercase text-slate-600 mb-1">
-                    Phone Number
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-semibold uppercase text-slate-600">
+                      Phone Number
+                    </label>
+                    {renderConfidenceBadge("phone")}
+                  </div>
                   <input
                     type="text"
                     value={data.personalInfo.phone}
                     onChange={(e) => handlePersonalInfoChange("phone", e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:bg-white focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-semibold uppercase text-slate-600">
+                      Location / City
+                    </label>
+                    {renderConfidenceBadge("location")}
+                  </div>
+                  <input
+                    type="text"
+                    value={data.personalInfo.location || ""}
+                    onChange={(e) => handlePersonalInfoChange("location", e.target.value)}
                     className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:bg-white focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -182,17 +264,6 @@ export default function ImportReviewModal({
                     className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:bg-white focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold uppercase text-slate-600 mb-1">
-                    Website / Portfolio
-                  </label>
-                  <input
-                    type="text"
-                    value={data.personalInfo.website || ""}
-                    onChange={(e) => handlePersonalInfoChange("website", e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:bg-white focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
               </div>
 
               <div>
@@ -201,9 +272,9 @@ export default function ImportReviewModal({
                 </label>
                 <textarea
                   rows={3}
-                  value={data.summary}
+                  value={data.summary || ""}
                   onChange={(e) => setData({ ...data, summary: e.target.value })}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:bg-white focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:bg-white focus:ring-2 focus:ring-blue-500"
                 />
               </div>
             </div>
@@ -211,40 +282,28 @@ export default function ImportReviewModal({
 
           {activeTab === "experience" && (
             <div className="space-y-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-semibold uppercase text-slate-500">
+                  {data.experience.length} Positions Extracted
+                </span>
+                {renderConfidenceBadge("experience")}
+              </div>
               {data.experience.length === 0 ? (
-                <div className="text-center py-8 text-slate-400 text-sm">
-                  No experience entries detected. You can add them in the editor.
-                </div>
+                <p className="text-sm text-slate-400 py-6 text-center">No experience positions detected.</p>
               ) : (
                 data.experience.map((exp, idx) => (
-                  <div
-                    key={exp.id}
-                    className="p-4 rounded-xl border border-slate-200 bg-slate-50/60 relative group"
-                  >
+                  <div key={exp.id} className="p-4 bg-slate-50 border border-slate-200 rounded-xl relative">
                     <button
                       type="button"
                       onClick={() => handleRemoveExperience(exp.id)}
-                      className="absolute top-3 right-3 text-slate-400 hover:text-red-600 transition"
-                      title="Remove"
+                      className="absolute top-4 right-4 text-slate-400 hover:text-red-500 transition"
+                      title="Remove item"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-2 pr-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-2">
                       <div>
-                        <label className="text-xs font-medium text-slate-500">Job Title</label>
-                        <input
-                          type="text"
-                          value={exp.position}
-                          onChange={(e) => {
-                            const updated = [...data.experience];
-                            updated[idx].position = e.target.value;
-                            setData({ ...data, experience: updated });
-                          }}
-                          className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-900"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs font-medium text-slate-500">Company</label>
+                        <label className="block text-[11px] font-medium text-slate-500">Company</label>
                         <input
                           type="text"
                           value={exp.company}
@@ -256,19 +315,47 @@ export default function ImportReviewModal({
                           className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-900"
                         />
                       </div>
+                      <div>
+                        <label className="block text-[11px] font-medium text-slate-500">Position / Title</label>
+                        <input
+                          type="text"
+                          value={exp.position}
+                          onChange={(e) => {
+                            const updated = [...data.experience];
+                            updated[idx].position = e.target.value;
+                            setData({ ...data, experience: updated });
+                          }}
+                          className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-900"
+                        />
+                      </div>
                     </div>
-                    <div>
-                      <label className="text-xs font-medium text-slate-500">Description / Bullets</label>
-                      <textarea
-                        rows={2}
-                        value={exp.description}
-                        onChange={(e) => {
-                          const updated = [...data.experience];
-                          updated[idx].description = e.target.value;
-                          setData({ ...data, experience: updated });
-                        }}
-                        className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-700"
-                      />
+                    <div className="grid grid-cols-2 gap-3 mb-2">
+                      <div>
+                        <label className="block text-[11px] font-medium text-slate-500">Start Date</label>
+                        <input
+                          type="text"
+                          value={exp.startDate}
+                          onChange={(e) => {
+                            const updated = [...data.experience];
+                            updated[idx].startDate = e.target.value;
+                            setData({ ...data, experience: updated });
+                          }}
+                          className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-900"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-medium text-slate-500">End Date</label>
+                        <input
+                          type="text"
+                          value={exp.endDate}
+                          onChange={(e) => {
+                            const updated = [...data.experience];
+                            updated[idx].endDate = e.target.value;
+                            setData({ ...data, experience: updated });
+                          }}
+                          className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-900"
+                        />
+                      </div>
                     </div>
                   </div>
                 ))
@@ -278,27 +365,28 @@ export default function ImportReviewModal({
 
           {activeTab === "education" && (
             <div className="space-y-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-semibold uppercase text-slate-500">
+                  {data.education.length} Academic Credentials Extracted
+                </span>
+                {renderConfidenceBadge("education")}
+              </div>
               {data.education.length === 0 ? (
-                <div className="text-center py-8 text-slate-400 text-sm">
-                  No education entries detected. You can add them in the editor.
-                </div>
+                <p className="text-sm text-slate-400 py-6 text-center">No education records detected.</p>
               ) : (
                 data.education.map((edu, idx) => (
-                  <div
-                    key={edu.id}
-                    className="p-4 rounded-xl border border-slate-200 bg-slate-50/60 relative group"
-                  >
+                  <div key={edu.id} className="p-4 bg-slate-50 border border-slate-200 rounded-xl relative">
                     <button
                       type="button"
                       onClick={() => handleRemoveEducation(edu.id)}
-                      className="absolute top-3 right-3 text-slate-400 hover:text-red-600 transition"
-                      title="Remove"
+                      className="absolute top-4 right-4 text-slate-400 hover:text-red-500 transition"
+                      title="Remove item"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pr-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <div>
-                        <label className="text-xs font-medium text-slate-500">Institution / University</label>
+                        <label className="block text-[11px] font-medium text-slate-500">Institution</label>
                         <input
                           type="text"
                           value={edu.institution}
@@ -307,11 +395,11 @@ export default function ImportReviewModal({
                             updated[idx].institution = e.target.value;
                             setData({ ...data, education: updated });
                           }}
-                          className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-900"
+                          className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-900"
                         />
                       </div>
                       <div>
-                        <label className="text-xs font-medium text-slate-500">Degree / Major</label>
+                        <label className="block text-[11px] font-medium text-slate-500">Degree / Major</label>
                         <input
                           type="text"
                           value={edu.degree}
@@ -332,6 +420,12 @@ export default function ImportReviewModal({
 
           {activeTab === "skills" && (
             <div>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-semibold uppercase text-slate-500">
+                  {data.skills.length} Skills Extracted
+                </span>
+                {renderConfidenceBadge("skills")}
+              </div>
               <form onSubmit={handleAddSkill} className="flex gap-2 mb-4">
                 <input
                   type="text"
@@ -349,7 +443,7 @@ export default function ImportReviewModal({
                 </button>
               </form>
 
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-2 max-h-64 overflow-y-auto p-1">
                 {data.skills.map((skill) => (
                   <span
                     key={skill.id}
@@ -368,17 +462,75 @@ export default function ImportReviewModal({
               </div>
             </div>
           )}
+
+          {activeTab === "projects" && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-semibold uppercase text-slate-500">
+                  {data.projects.length} Projects Extracted
+                </span>
+                {renderConfidenceBadge("projects")}
+              </div>
+              {data.projects.length === 0 ? (
+                <p className="text-sm text-slate-400 py-6 text-center">No projects detected.</p>
+              ) : (
+                data.projects.map((proj) => (
+                  <div key={proj.id} className="p-4 bg-slate-50 border border-slate-200 rounded-xl">
+                    <h4 className="font-semibold text-sm text-slate-800">{proj.title}</h4>
+                    {proj.description && (
+                      <p className="text-xs text-slate-600 mt-1 whitespace-pre-line">{proj.description}</p>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+
+          {activeTab === "certifications" && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-semibold uppercase text-slate-500">
+                  {data.certifications.length} Certifications Extracted
+                </span>
+                {renderConfidenceBadge("certifications")}
+              </div>
+              {data.certifications.length === 0 ? (
+                <p className="text-sm text-slate-400 py-6 text-center">No certifications detected.</p>
+              ) : (
+                data.certifications.map((cert) => (
+                  <div key={cert.id} className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between">
+                    <div>
+                      <h4 className="font-semibold text-sm text-slate-800">{cert.name}</h4>
+                      {cert.issuer && <p className="text-xs text-slate-500">{cert.issuer} {cert.date ? `• ${cert.date}` : ""}</p>}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
         </div>
 
         {/* Footer */}
         <div className="p-4 px-6 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between shrink-0">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-100 text-sm font-medium transition"
-          >
-            Cancel
-          </button>
+          <div className="flex items-center gap-2">
+            {onStartOver && (
+              <button
+                type="button"
+                onClick={onStartOver}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 text-xs font-semibold transition"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                Start Over
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-3.5 py-2 rounded-xl text-slate-500 hover:text-slate-800 text-xs font-medium transition"
+            >
+              Cancel
+            </button>
+          </div>
           <button
             type="button"
             onClick={() => onConfirm(data)}

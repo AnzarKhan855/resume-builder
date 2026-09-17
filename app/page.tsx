@@ -481,6 +481,10 @@ export default function LandingPage() {
           initialData={parsedImportData}
           onClose={() => setParsedImportData(null)}
           onConfirm={handleImportConfirmed}
+          onStartOver={() => {
+            setParsedImportData(null);
+            setIsUploadModalOpen(true);
+          }}
         />
       )}
     </div>

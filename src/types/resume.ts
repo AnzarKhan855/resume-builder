@@ -74,6 +74,35 @@ export interface LanguageItem {
   proficiency: "Native" | "Fluent" | "Professional" | "Conversational" | "Basic";
 }
 
+export interface PublicationItem {
+  id: string;
+  title: string;
+  publisher?: string;
+  date?: string;
+  url?: string;
+  description?: string;
+}
+
+export interface VolunteerItem {
+  id: string;
+  organization: string;
+  role: string;
+  location?: string;
+  startDate?: string;
+  endDate?: string;
+  current?: boolean;
+  description?: string;
+  highlights?: string[];
+}
+
+export interface CourseworkItem {
+  id: string;
+  name: string;
+  institution?: string;
+  date?: string;
+  skills?: string[];
+}
+
 export interface CustomSectionItem {
   id: string;
   title: string;
@@ -88,7 +117,16 @@ export interface CustomSection {
   items: CustomSectionItem[];
 }
 
-export type TemplateId = "classic" | "modern" | "minimal" | "professional" | "technical" | "blue" | "dark" | "green";
+export type TemplateId =
+  | "classic"
+  | "modern"
+  | "minimal"
+  | "professional"
+  | "technical"
+  | "blue"
+  | "dark"
+  | "green"
+  | string;
 
 export interface ResumeCustomization {
   themeId: string;
@@ -116,9 +154,13 @@ export interface ResumeData {
   certifications: CertificationItem[];
   achievements: AchievementItem[];
   languages: LanguageItem[];
+  publications?: PublicationItem[];
+  volunteer?: VolunteerItem[];
+  coursework?: CourseworkItem[];
   customSections: CustomSection[];
   sectionOrder: string[];
   customization: ResumeCustomization;
+  isAtsMode?: boolean;
   createdAt?: string;
   updatedAt?: string;
 
@@ -143,6 +185,9 @@ export const DEFAULT_SECTION_ORDER = [
   "certifications",
   "achievements",
   "languages",
+  "publications",
+  "volunteer",
+  "coursework",
   "customSections",
 ];
 
@@ -178,7 +223,11 @@ export const INITIAL_RESUME_DATA: ResumeData = {
   certifications: [],
   achievements: [],
   languages: [],
+  publications: [],
+  volunteer: [],
+  coursework: [],
   customSections: [],
   sectionOrder: DEFAULT_SECTION_ORDER,
   customization: DEFAULT_CUSTOMIZATION,
+  isAtsMode: false,
 };

@@ -75,7 +75,7 @@ export default function DashboardPage() {
       } else {
         alert("Failed to delete resume");
       }
-    } catch (err) {
+    } catch {
       alert("Error deleting resume");
     } finally {
       setDeletingId(null);
@@ -94,7 +94,7 @@ export default function DashboardPage() {
       } else {
         alert("Failed to duplicate resume");
       }
-    } catch (err) {
+    } catch {
       alert("Error duplicating resume");
     } finally {
       setActiveMenuId(null);
@@ -413,6 +413,10 @@ export default function DashboardPage() {
           initialData={parsedImportData}
           onClose={() => setParsedImportData(null)}
           onConfirm={handleImportConfirmed}
+          onStartOver={() => {
+            setParsedImportData(null);
+            setIsUploadModalOpen(true);
+          }}
         />
       )}
     </div>

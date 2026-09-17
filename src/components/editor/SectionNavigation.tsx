@@ -12,6 +12,10 @@ import {
   Globe,
   PlusSquare,
   ArrowUpDown,
+  Trophy,
+  BookOpen,
+  HeartHandshake,
+  BookCheck,
 } from "lucide-react";
 
 export type SectionTabId =
@@ -22,7 +26,11 @@ export type SectionTabId =
   | "projects"
   | "skills"
   | "certifications"
+  | "achievements"
   | "languages"
+  | "publications"
+  | "volunteer"
+  | "coursework"
   | "customSections"
   | "reorder";
 
@@ -40,7 +48,11 @@ export const SECTIONS_CONFIG: { id: SectionTabId; label: string; icon: any }[] =
   { id: "projects", label: "Projects", icon: FolderGit2 },
   { id: "skills", label: "Skills", icon: Code2 },
   { id: "certifications", label: "Certifications", icon: Award },
+  { id: "achievements", label: "Achievements", icon: Trophy },
   { id: "languages", label: "Languages", icon: Globe },
+  { id: "publications", label: "Publications", icon: BookOpen },
+  { id: "volunteer", label: "Volunteer", icon: HeartHandshake },
+  { id: "coursework", label: "Coursework", icon: BookCheck },
   { id: "customSections", label: "Custom Section", icon: PlusSquare },
   { id: "reorder", label: "Reorder Sections", icon: ArrowUpDown },
 ];
