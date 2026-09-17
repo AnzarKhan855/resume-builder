@@ -2,14 +2,61 @@ import { NextRequest, NextResponse } from "next/server";
 import { parseResumeText } from "@/src/lib/resume-parser";
 import mammoth from "mammoth";
 
+function isPdfBuffer(buffer: Buffer): boolean {
+  if (buffer.length < 4) return false;
+  // Check within first 1024 bytes for %PDF (PDF 1.0-2.0 spec)
+  const headerSlice = buffer.subarray(0, Math.min(buffer.length, 1024));
+  return headerSlice.includes(Buffer.from("%PDF"));
+}
+
+function isDocxBuffer(buffer: Buffer): boolean {
+  if (buffer.length < 4) return false;
+  // PK\x03\x04 zip archive header
+  return (
+    buffer[0] === 0x50 &&
+    buffer[1] === 0x4b &&
+    buffer[2] === 0x03 &&
+    buffer[3] === 0x04
+  );
+}
+
+// In-memory worker setup to prevent Next.js chunk relative import failures
+async function ensurePdfWorker() {
+  if (!(globalThis as any).pdfjsWorker) {
+    try {
+      const worker = await import("pdfjs-dist/legacy/build/pdf.worker.mjs");
+      (globalThis as any).pdfjsWorker = worker;
+    } catch (err) {
+      console.warn("PDF_WORKER_INIT_WARN:", err);
+    }
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
-    const formData = await req.formData();
+    let formData: FormData;
+    try {
+      formData = await req.formData();
+    } catch {
+      return NextResponse.json(
+        {
+          error: "INVALID_FILE",
+          message: "Malformed request. Please upload a multipart/form-data payload with a 'file' field.",
+        },
+        { status: 400 }
+      );
+    }
+
     const file = formData.get("file") as File | null;
 
-    if (!file) {
+    if (!file || !(file instanceof File) || file.size === 0) {
       return NextResponse.json(
-        { message: "No file uploaded. Please select a PDF or DOCX resume to import." },
+        {
+          error: !file ? "MISSING_FILE" : "EMPTY_FILE",
+          message: !file
+            ? "No file uploaded. Please select a PDF or DOCX resume to import."
+            : "The uploaded file is empty. Please upload a valid resume.",
+        },
         { status: 400 }
       );
     }
@@ -18,22 +65,62 @@ export async function POST(req: NextRequest) {
     const MAX_SIZE = 5 * 1024 * 1024;
     if (file.size > MAX_SIZE) {
       return NextResponse.json(
-        { message: "File exceeds 5MB size limit. Please upload a smaller file." },
+        {
+          error: "FILE_TOO_LARGE",
+          message: "File exceeds 5MB size limit. Please upload a smaller file.",
+        },
         { status: 400 }
       );
     }
 
     const fileName = (file.name || "").toLowerCase();
+    const fileType = (file.type || "").toLowerCase();
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
+    if (buffer.length === 0) {
+      return NextResponse.json(
+        {
+          error: "EMPTY_FILE",
+          message: "The uploaded file contains no data.",
+        },
+        { status: 400 }
+      );
+    }
+
     let extractedText = "";
 
+    const isPdf =
+      fileName.endsWith(".pdf") ||
+      fileType === "application/pdf" ||
+      fileType === "application/x-pdf" ||
+      isPdfBuffer(buffer);
+
+    const isDocx =
+      fileName.endsWith(".docx") ||
+      fileName.endsWith(".doc") ||
+      fileType.includes("wordprocessingml") ||
+      isDocxBuffer(buffer);
+
     // 1. PDF Parsing
-    if (fileName.endsWith(".pdf") || file.type === "application/pdf") {
+    if (isPdf) {
+      // Validate magic bytes
+      if (!isPdfBuffer(buffer)) {
+        return NextResponse.json(
+          {
+            error: "PDF_CORRUPTED",
+            isScanned: false,
+            message: "This PDF appears to be corrupted or is not a valid PDF document.",
+          },
+          { status: 422 }
+        );
+      }
+
       try {
+        await ensurePdfWorker();
         const { PDFParse } = await import("pdf-parse");
-        const parser = new PDFParse({ data: buffer });
+        const parser = new PDFParse({ data: new Uint8Array(buffer) });
+
         try {
           const textResult = await parser.getText();
           extractedText = (textResult?.text || "").trim();
@@ -47,6 +134,7 @@ export async function POST(req: NextRequest) {
         if (!cleanedText || cleanedText.length < 30) {
           return NextResponse.json(
             {
+              error: "PDF_SCANNED",
               isScanned: true,
               message:
                 "This PDF appears to be an image scan or flattened graphical document without selectable text. Antigravity requires text-based PDFs or Word documents to accurately extract your data.",
@@ -58,35 +146,68 @@ export async function POST(req: NextRequest) {
 
         extractedText = cleanedText;
       } catch (pdfErr: any) {
-        console.error("PDF_PARSE_ERROR:", pdfErr);
+        console.error("PDF_PARSE_ERROR:", pdfErr?.message || pdfErr);
+
+        const errMsg = String(pdfErr?.message || "").toLowerCase();
+        const errName = String(pdfErr?.name || "");
+
+        // Distinguish password protected / encrypted
+        if (
+          errName === "PasswordException" ||
+          errMsg.includes("password") ||
+          errMsg.includes("encrypted") ||
+          pdfErr?.code === 1
+        ) {
+          return NextResponse.json(
+            {
+              error: "PDF_PASSWORD_PROTECTED",
+              isScanned: false,
+              message: "This PDF is password-protected. Please remove the password and try again.",
+            },
+            { status: 422 }
+          );
+        }
+
+        // Distinguish corrupted / invalid PDF
+        if (
+          errName === "InvalidPDFException" ||
+          errName === "FormatError" ||
+          errMsg.includes("invalid pdf") ||
+          errMsg.includes("corrupt")
+        ) {
+          return NextResponse.json(
+            {
+              error: "PDF_CORRUPTED",
+              isScanned: false,
+              message: "This PDF appears to be corrupted. Try opening and re-saving it before uploading.",
+              details: pdfErr?.message || "PDF decoding failed",
+            },
+            { status: 422 }
+          );
+        }
+
+        // General parser / runtime failure
         return NextResponse.json(
           {
+            error: "PDF_PARSE_FAILED",
             isScanned: false,
-            message:
-              "Could not read this PDF document. The file may be password-protected or corrupted. Please try saving it again or upload a DOCX file.",
-            errorDetail: pdfErr?.message || "PDF decoding failed",
+            message: "We couldn't process this PDF. Please try another PDF or DOCX file.",
+            details: pdfErr?.message || "PDF processing failed",
           },
           { status: 422 }
         );
       }
     }
     // 2. DOCX Parsing
-    else if (
-      fileName.endsWith(".docx") ||
-      fileName.endsWith(".doc") ||
-      file.type.includes("wordprocessingml")
-    ) {
+    else if (isDocx) {
       // Validate DOCX Magic Bytes (PK\x03\x04 = 0x50, 0x4b, 0x03, 0x04)
-      if (
-        buffer.length < 4 ||
-        buffer[0] !== 0x50 ||
-        buffer[1] !== 0x4b ||
-        buffer[2] !== 0x03 ||
-        buffer[3] !== 0x04
-      ) {
+      if (!isDocxBuffer(buffer)) {
         return NextResponse.json(
           {
-            message: "The uploaded file does not have valid DOCX format headers. It may be an unsupported legacy binary DOC or corrupted file.",
+            error: "DOCX_CORRUPTED",
+            isScanned: false,
+            message:
+              "The uploaded file does not have valid DOCX format headers. It may be an unsupported legacy binary DOC or corrupted file.",
           },
           { status: 422 }
         );
@@ -99,6 +220,7 @@ export async function POST(req: NextRequest) {
         if (!extractedText || extractedText.length < 30) {
           return NextResponse.json(
             {
+              error: "DOCX_NO_TEXT",
               isScanned: true,
               message:
                 "We could not extract readable text from this Word document. It may contain embedded images rather than text.",
@@ -108,19 +230,24 @@ export async function POST(req: NextRequest) {
           );
         }
       } catch (docxErr: any) {
-        console.error("DOCX_PARSE_ERROR:", docxErr);
+        console.error("DOCX_PARSE_ERROR:", docxErr?.message || docxErr);
         return NextResponse.json(
           {
+            error: "DOCX_PARSE_FAILED",
+            isScanned: false,
             message: "Failed to extract text from DOCX file. Please verify the document integrity.",
-            errorDetail: docxErr?.message,
+            details: docxErr?.message || "DOCX processing failed",
           },
           { status: 422 }
         );
       }
     } else {
       return NextResponse.json(
-        { message: "Unsupported file format. Please upload a .pdf or .docx document." },
-        { status: 400 }
+        {
+          error: "UNSUPPORTED_FILE_TYPE",
+          message: "Unsupported file format. Please upload a .pdf or .docx document.",
+        },
+        { status: 415 }
       );
     }
 
@@ -137,7 +264,10 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     console.error("PARSE_API_ERROR:", error);
     return NextResponse.json(
-      { message: error?.message || "Failed to process resume file" },
+      {
+        error: "INTERNAL_SERVER_ERROR",
+        message: error?.message || "Failed to process resume file",
+      },
       { status: 500 }
     );
   }

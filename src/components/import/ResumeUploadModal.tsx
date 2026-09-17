@@ -90,7 +90,7 @@ export default function ResumeUploadModal({
       const result = await response.json();
 
       if (!response.ok) {
-        if (result.isScanned) {
+        if (result.isScanned || result.error === "PDF_SCANNED") {
           setIsScannedPdf(true);
           setError(
             result.message ||
@@ -98,7 +98,25 @@ export default function ResumeUploadModal({
           );
           return;
         }
-        throw new Error(result.message || "Failed to analyze resume.");
+
+        let userMsg = result.message;
+        if (result.error === "PDF_PASSWORD_PROTECTED") {
+          userMsg = "This PDF is password-protected. Please remove the password and try again.";
+        } else if (result.error === "PDF_CORRUPTED") {
+          userMsg = "This PDF appears to be corrupted. Try opening and re-saving it before uploading.";
+        } else if (result.error === "PDF_NO_TEXT") {
+          userMsg = "No selectable text could be extracted from this PDF. Please upload a text-based resume.";
+        } else if (result.error === "PDF_PARSE_FAILED") {
+          userMsg = "We couldn't process this PDF. Please try another PDF or DOCX file.";
+        } else if (result.error === "EMPTY_FILE") {
+          userMsg = "The uploaded file is empty. Please upload a valid resume.";
+        } else if (result.error === "FILE_TOO_LARGE") {
+          userMsg = "File exceeds 5MB size limit. Please upload a smaller file.";
+        } else if (result.error === "UNSUPPORTED_FILE_TYPE") {
+          userMsg = "Unsupported file format. Please upload a PDF or DOCX file.";
+        }
+
+        throw new Error(userMsg || "Failed to analyze resume.");
       }
 
       onSuccess(result.data);
